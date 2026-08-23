@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# The product app and auth screens have nothing to index.
+Disallow: /app
+Disallow: /login
+Disallow: /signup
+
+Sitemap: https://moximos.com/sitemap.xml

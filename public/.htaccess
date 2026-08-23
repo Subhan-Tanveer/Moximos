@@ -1,0 +1,43 @@
+# Moximos — Apache / LiteSpeed config for Hostinger.
+# Vite copies everything in public/ into dist/, so this ships with the build.
+
+# ── SPA routing ───────────────────────────────────────────────
+# Without this, only "/" works: a visitor opening moximos.com/pricing
+# directly (or refreshing on it) asks Apache for a file that doesn't
+# exist and gets a 404. Send anything that isn't a real file to
+# index.html and let react-router resolve the path.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Leave real files and directories alone.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# ── Caching ───────────────────────────────────────────────────
+# Build assets carry a content hash in the filename, so they can be
+# cached forever. index.html must never be cached or visitors keep
+# loading the previous deploy's asset manifest.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2|woff|ttf|svg|png|jpg|jpeg|webp|avif)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  <FilesMatch "\.(html)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ── Compression ───────────────────────────────────────────────
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>

@@ -1,0 +1,20 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.*
+!.env.example
+.DS_Store
+.vite
+*.log
+npm-debug.log*
+
+# Local "database" — user accounts (password hashes) and generated
+# projects. Never commit real user data.
+server/data/db.json
+
+# Local scratch/test scripts
+_smoke*.mjs
+_probe*.mjs
+_cptest.mjs

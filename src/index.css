@@ -1,0 +1,265 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:ital,wght@0,100..900;1,100..900&family=Urbanist:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   MOXIMOS DESIGN TOKENS
+   Space palette. Void black base, nebula gradients, electric
+   accents, amber reserved exclusively for buy-moments.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  --font-sans: 'Urbanist', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* Base — the void */
+  --color-void: #050507;
+  --color-abyss: #0A0A0F;
+  --color-hull: #12121A;
+  --color-panel: #16161F;
+
+  /* Nebula gradient family */
+  --color-navy: #0D1128;
+  --color-nebula: #5B3AA0;
+  --color-magenta: #C23FDB;
+
+  /* Electric accents — interaction, glow, data */
+  --color-ion: #4CE0FF;
+  --color-violet: #8B5CF6;
+
+  /* Warm accent — CTA moments ONLY */
+  --color-solar: #FFB84C;
+
+  /* Text */
+  --color-starlight: #F5F5F7;
+  --color-dust: #A5A5B8;
+  --color-faint: #6B6B80;
+
+  /* Motion */
+  --ease-launch: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-orbit: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ───────── Base ───────── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* Lenis drives scrolling; never let the browser fight it. */
+  scroll-behavior: auto;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-void);
+  color: var(--color-starlight);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--color-violet);
+  color: #fff;
+}
+
+/* ───────── Scrollbars ───────── */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2A2A38; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-nebula); }
+
+/* ───────── Typography helpers ───────── */
+.font-display {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+}
+
+.label-mono {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+.text-nebula-gradient {
+  background: linear-gradient(103deg, #F5F5F7 0%, #C9B8FF 38%, var(--color-magenta) 70%, var(--color-ion) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-ion-gradient {
+  background: linear-gradient(96deg, var(--color-ion) 0%, var(--color-violet) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ───────── Surfaces ───────── */
+.glass-panel {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.012) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.glass-panel-hover {
+  transition: border-color 0.45s var(--ease-launch), background 0.45s var(--ease-launch),
+    transform 0.45s var(--ease-launch);
+}
+
+.glass-panel-hover:hover {
+  border-color: rgba(139, 92, 246, 0.45);
+  background: linear-gradient(160deg, rgba(139, 92, 246, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
+/* Hairline grid used behind "system readout" sections */
+.grid-lines {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* Film grain — kills gradient banding on the big nebula washes */
+.noise-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CSS STARFIELD FALLBACK
+   Shipped instead of the WebGL scene on <768px and whenever
+   prefers-reduced-motion is set. Three repeating radial-gradient
+   layers ≈ 0 runtime cost, still reads unmistakably as space.
+   ───────────────────────────────────────────────────────────── */
+.css-starfield {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(91, 58, 160, 0.5) 0%, transparent 60%),
+    radial-gradient(ellipse 90% 60% at 85% 15%, rgba(194, 63, 219, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 70% at 10% 70%, rgba(13, 17, 40, 0.9) 0%, transparent 60%),
+    var(--color-void);
+}
+
+.css-starfield::before,
+.css-starfield::after {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background-repeat: repeat;
+}
+
+.css-starfield::before {
+  background-image:
+    radial-gradient(1.4px 1.4px at 20px 30px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1.2px 1.2px at 130px 80px, rgba(200, 220, 255, 0.75), transparent),
+    radial-gradient(1px 1px at 210px 150px, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(1.6px 1.6px at 90px 210px, rgba(179, 220, 255, 0.85), transparent);
+  background-size: 280px 280px;
+  animation: drift-slow 190s linear infinite;
+}
+
+.css-starfield::after {
+  background-image:
+    radial-gradient(1px 1px at 60px 60px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(0.8px 0.8px at 170px 20px, rgba(255, 255, 255, 0.42), transparent),
+    radial-gradient(1.1px 1.1px at 240px 190px, rgba(204, 179, 255, 0.55), transparent);
+  background-size: 190px 190px;
+  animation: drift-slow 120s linear infinite reverse;
+}
+
+@keyframes drift-slow {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-190px, -190px, 0); }
+}
+
+/* ───────── Keyframes ───────── */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 35s linear infinite;
+}
+
+.animate-marquee:hover { animation-play-state: paused; }
+
+.masked-marquee {
+  mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+}
+
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-orbit { animation: orbit-spin 22s linear infinite; }
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.14); }
+}
+
+.animate-pulse-glow { animation: pulse-glow 3.4s var(--ease-orbit) infinite; }
+
+@keyframes dash-flow {
+  to { stroke-dashoffset: -1000; }
+}
+
+.animate-dash-flow { animation: dash-flow 18s linear infinite; }
+
+/* ───────── Dot loader (product app) ───────── */
+.dot-loader { display: flex; gap: 4px; align-items: center; }
+
+.dot-loader span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #18181b;
+  opacity: 0.8;
+}
+
+/* ───────── Sandpack overrides (product app) ───────── */
+.sp-wrapper { border-radius: 0 !important; border: none !important; height: 100% !important; }
+.sp-layout { border: none !important; border-radius: 0 !important; background: transparent !important; height: 100% !important; }
+.sp-preview { height: 100% !important; }
+.sp-preview-iframe { height: 100% !important; }
+.sp-code-editor { height: 100% !important; }
+
+/* ─────────────────────────────────────────────────────────────
+   REDUCED MOTION
+   The real guarantee lives in JS: useMotionPrefs reports animate=false,
+   so GSAP never runs and never applies a hidden "from" state — content
+   is simply rendered as-is. This block handles what JS doesn't touch,
+   namely the looping CSS animations declared above.
+   ───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-marquee { animation: none !important; }
+}
