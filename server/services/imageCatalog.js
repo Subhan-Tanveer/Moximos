@@ -120,6 +120,55 @@ export const IMAGE_CATALOG = {
         "photo-1464366400600-7168b8af9bc3", // table setting
         "photo-1511578314322-379afb476865", // celebration
     ],
+    pets: [
+        "photo-1450778869180-41d0601e046e", // dog and cat together
+        "photo-1548199973-03cce0bbc87b", // pet close-up
+        "photo-1552053831-71594a27632d", // grooming
+    ],
+    plumbing: [
+        "photo-1607472586893-edb57bdc0e39", // pipework on brick
+        "photo-1621905251189-08b45d6a269e", // tradesman at work
+    ],
+    cleaning: [
+        "photo-1581578731548-c64695cc6952", // cleaning a window
+        "photo-1527515637462-cff94eecc1ac", // domestic cleaning
+        "photo-1585421514738-01798e348b17", // supplies
+    ],
+    construction: [
+        "photo-1541888946425-d81bb19240f5", // site work
+        "photo-1503387762-592deb58ef4e", // house exterior build
+        "photo-1504307651254-35680f356dfd", // structure detail
+    ],
+    childcare: [
+        "photo-1503454537195-1dcabb73ffb9", // child painting
+        "photo-1587654780291-39c9404d746b", // kids activity
+        "photo-1471286174890-9c112ffca5b4", // play detail
+    ],
+    travel: [
+        "photo-1566073771259-6a8506099945", // hotel exterior
+        "photo-1520250497591-112f2f40a3f4", // suitcase and travel
+        "photo-1517840901100-8179e982acb7", // destination
+    ],
+    wellness: [
+        "photo-1544161515-4ab6ce6db874", // massage treatment
+        "photo-1540555700478-4be289fbecef", // spa detail
+        "photo-1600334089648-b0d9d3028eb2", // relaxation
+    ],
+    music: [
+        "photo-1493225457124-a3eb161ffa5f", // live performance
+        "photo-1511671782779-c97d3d27a1d4", // instruments
+        "photo-1470019693664-1d202d2c0907", // studio
+    ],
+    legal: [
+        "photo-1589829545856-d10d557cf95f", // scales of justice
+        "photo-1450101499163-c8848c66ca85", // law books
+        "photo-1505664194779-8beaceb93744", // office desk
+    ],
+    nonprofit: [
+        "photo-1593113646773-028c64a8f1b8", // volunteers together
+        "photo-1509099836639-18ba1795216d", // community work
+        "photo-1469571486292-0ba58a3f068b", // outreach
+    ],
     portrait: [
         "photo-1507003211169-0a1dd7228f2d", // man, neutral background
         "photo-1494790108377-be9c29b29330", // woman, neutral background
@@ -127,31 +176,67 @@ export const IMAGE_CATALOG = {
     ],
 };
 
-// Which catalog categories a project should draw from, in priority order.
-// Keyword-matched against the user's own description of the business — the
-// only reliable signal available at planning time.
+/*
+ * Niche routing.
+ *
+ * Deliberately broad: a sub-niche that matches nothing falls through to
+ * "office", which is generic stock and the most visible way a generated page
+ * looks like it was made for nobody. Many niches share honest imagery — a
+ * plumber, an electrician and an HVAC engineer are all a tradesperson working
+ * — so several keys map to the same verified set rather than pretending each
+ * needs its own photographs.
+ *
+ * ORDER MATTERS. pickCategories takes the first match, and short keywords are
+ * substrings of longer ones ("barbershop" contains "barber"; "coffee roaster"
+ * contains "coffee"; "dog grooming" contains "grooming", which salon also
+ * claims). Specific first, generic last.
+ */
 const CATEGORY_KEYWORDS = {
-    // Specific trades first — a broader category below would otherwise
-    // swallow them ("barbershop" contains "barber"; "coffee roaster"
-    // contains "coffee").
-    tattoo: ["tattoo", "piercing", "ink studio", "body art"],
-    barber: ["barber", "barbershop", "men's grooming", "shave"],
-    coffee: ["coffee", "espresso", "roaster", "coffee shop", "cafe", "café"],
-    bakery: ["bakery", "baker", "pastry", "bread", "cake", "patisserie"],
-    automotive: ["auto repair", "mechanic", "car repair", "detailing", "tire", "body shop", "garage", "automotive"],
-    photography: ["photograph", "videograph", "film studio", "portrait studio"],
-    realestate: ["real estate", "realtor", "property", "estate agent", "letting"],
-    education: ["tutor", "school", "academy", "course", "training", "coaching", "driving instructor"],
-    events: ["event", "wedding", "party", "venue", "catering", "dj ", "planner"],
-    retail: ["shop", "store", "boutique", "retail", "gift", "florist"],
-    restaurant: ["restaurant", "dining", "bistro", "eatery", "steakhouse", "sushi", "pizzeria", "food truck", "brasserie", "diner"],
-    food: ["menu", "food", "chef", "dessert", "pizza", "kitchen", "brunch"],
-    roofing: ["roof", "roofing", "contractor", "construction", "remodel", "renovation", "builder", "fence", "deck", "siding", "gutter"],
-    salon: ["salon", "hair", "beauty", "spa", "nails", "stylist", "med spa", "lash"],
-    dental: ["dental", "dentist", "orthodont", "clinic", "medical", "doctor", "health", "chiropract", "veterinar", "physio"],
-    fitness: ["gym", "fitness", "trainer", "yoga", "pilates", "crossfit", "workout", "wellness"],
-    landscaping: ["landscap", "lawn", "garden", "outdoor", "patio", "pool", "tree", "pest control", "cleaning", "pressure wash"],
-    office: ["law", "attorney", "legal", "account", "consult", "agency", "insurance", "financial", "b2b", "saas", "software"],
+    // ── Personal care and body ──────────────────────────────
+    tattoo: ["tattoo", "piercing", "ink studio", "body art", "flash art"],
+    barber: ["barber", "barbershop", "mens grooming", "shave", "beard trim", "fade"],
+    wellness: ["spa", "massage", "wellness", "reiki", "acupuncture", "sauna", "float tank", "day spa", "med spa", "medspa", "facial", "aesthetic clinic", "botox", "waxing"],
+    salon: ["salon", "hair", "beauty", "nails", "stylist", "lash", "brow", "colourist", "colorist", "blow dry", "makeup artist"],
+
+    // ── Food and drink ──────────────────────────────────────
+    coffee: ["coffee", "espresso", "roaster", "coffee shop", "cafe", "café", "barista"],
+    bakery: ["bakery", "baker", "pastry", "bread", "cake", "patisserie", "cupcake", "donut", "doughnut"],
+    restaurant: ["restaurant", "dining", "bistro", "eatery", "steakhouse", "sushi", "pizzeria", "food truck", "brasserie", "diner", "tapas", "ramen", "burger", "bbq", "barbecue", "gastropub", "pub", "cocktail", "brewery", "winery", "distillery"],
+    // "food" and "kitchen" were removed as keywords: they are substrings of
+    // things that are not food businesses at all — "charity food bank" routed
+    // to food imagery, and so did "kitchen fitter". The specific terms below
+    // still catch every real food business.
+    food: ["menu", "chef", "dessert", "pizza", "brunch", "meal prep", "catering", "butcher", "deli", "grocer", "farm shop"],
+
+    // ── Trades and home services ────────────────────────────
+    roofing: ["roof", "roofing", "shingle", "gutter", "siding", "fascia", "soffit", "chimney"],
+    plumbing: ["plumb", "electrician", "electrical", "hvac", "heating", "boiler", "furnace", "air conditioning", "drain", "sewer", "septic", "gas engineer", "handyman", "appliance repair", "locksmith", "garage door", "welding", "fabrication"],
+    construction: ["construction", "builder", "remodel", "renovation", "contractor", "carpentry", "carpenter", "joinery", "flooring", "tiling", "tiler", "drywall", "plaster", "painter", "decorator", "kitchen fitter", "bathroom fitter", "extension", "loft conversion", "scaffolding", "demolition", "concrete", "masonry", "glazier", "window fitter", "insulation", "solar"],
+    cleaning: ["cleaning", "cleaner", "janitorial", "housekeeping", "maid", "pressure wash", "power wash", "window clean", "carpet clean", "gutter clean", "chimney sweep", "waste removal", "junk removal", "man and van", "removals", "moving company", "movers", "storage"],
+    landscaping: ["landscap", "lawn", "garden", "outdoor", "patio", "decking", "fence", "fencing", "pool", "tree surgeon", "arborist", "pest control", "paving", "driveway", "turf", "irrigation", "snow removal"],
+
+    // ── Vehicles ────────────────────────────────────────────
+    automotive: ["auto repair", "mechanic", "car repair", "detailing", "tire", "tyre", "body shop", "garage", "automotive", "car wash", "vehicle wrap", "dealership", "motorcycle", "bike shop", "towing", "car rental", "driving school", "chauffeur", "taxi", "limo"],
+
+    // ── Health and clinical ─────────────────────────────────
+    dental: ["dental", "dentist", "orthodont", "hygienist", "implant", "invisalign"],
+    pets: ["vet", "veterinar", "pet", "dog", "cat", "puppy", "kennel", "cattery", "pet sitting", "dog walking", "grooming", "animal"],
+    fitness: ["gym", "fitness", "personal train", "yoga", "pilates", "crossfit", "workout", "bootcamp", "martial arts", "boxing", "climbing", "swim school", "dance studio", "physio", "sports therapy", "chiropract"],
+    childcare: ["childcare", "nursery", "daycare", "preschool", "kindergarten", "montessori", "babysit", "nanny", "kids club", "soft play", "childrens"],
+
+    // ── Professional services ───────────────────────────────
+    legal: ["law firm", "attorney", "lawyer", "legal", "solicitor", "barrister", "paralegal", "notary", "conveyancing"],
+    realestate: ["real estate", "realtor", "property", "estate agent", "letting", "lettings", "mortgage", "surveyor", "property management"],
+    photography: ["photograph", "videograph", "film studio", "portrait studio", "wedding photo", "drone"],
+    music: ["music", "band", "recording studio", "producer", "singer", "guitar lesson", "piano lesson", "music school", "sound engineer"],
+    education: ["tutor", "school", "academy", "course", "training", "coaching", "e-learning", "language school", "exam prep", "university"],
+    events: ["event", "wedding", "party", "venue", "planner", "florist", "balloon", "photo booth", "entertainer", "conference", "exhibition"],
+    travel: ["hotel", "motel", "bed and breakfast", "guest house", "hostel", "travel agen", "tour", "holiday", "vacation rental", "campsite", "glamping", "cruise"],
+    nonprofit: ["charity", "nonprofit", "non-profit", "ngo", "foundation", "community", "volunteer", "food bank", "shelter", "church", "mosque", "temple", "synagogue"],
+    retail: ["shop", "store", "boutique", "retail", "gift", "jewel", "clothing", "fashion", "furniture", "bookshop", "toy store", "pharmacy", "optician"],
+
+    // ── Generic fallback. Anything office-based lands here. ──
+    office: ["account", "bookkeep", "consult", "agency", "insurance", "financial", "b2b", "saas", "software", "startup", "recruit", "staffing", "marketing", "logistics", "freight", "printing", "signage", "it support", "cyber", "web design", "seo", "medical", "doctor", "clinic", "health"],
 };
 
 export function pickCategories(prompt) {

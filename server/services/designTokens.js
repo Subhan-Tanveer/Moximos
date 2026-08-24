@@ -293,20 +293,30 @@ p  { margin: 0 0 1.15em; max-width: 68ch; }
  * enforce it in code.
  */
 const ARCHETYPE_BY_INDUSTRY = [
-    // Trades and home services: warm, grounded, trustworthy. Never dark luxury.
-    { archetype: "Organic", words: ["landscap", "lawn", "garden", "tree service", "roof", "fence", "deck", "patio", "pool", "pest control", "cleaning", "pressure wash", "window clean", "hvac", "plumb", "electric", "handyman", "remodel", "renovation", "contractor", "construction", "siding", "gutter", "solar", "moving", "junk removal"] },
-    // Professional and financial services: credible, conservative.
-    { archetype: "Corporate", words: ["law firm", "attorney", "lawyer", "legal", "accounting", "accountant", "bookkeep", "insurance", "financial", "mortgage", "real estate", "realtor", "consulting", "consultant", "b2b", "logistics", "staffing", "recruit"] },
+    // Trades and home services: warm, grounded, trustworthy. Never dark luxury —
+    // a homeowner choosing a roofer is buying reliability, not glamour.
+    { archetype: "Organic", words: ["landscap", "lawn", "garden", "tree surgeon", "arborist", "roof", "fence", "deck", "patio", "paving", "driveway", "pool", "pest control", "cleaning", "cleaner", "pressure wash", "window clean", "carpet clean", "chimney", "hvac", "heating", "boiler", "plumb", "electrician", "handyman", "remodel", "renovation", "contractor", "construction", "builder", "carpentry", "carpenter", "joinery", "flooring", "tiling", "plaster", "painter", "decorator", "siding", "gutter", "solar", "removals", "man and van", "movers", "moving company", "junk removal", "waste removal", "locksmith", "farm", "nursery garden", "florist"] },
+
+    // Professional and financial: credible, conservative, unflashy.
+    { archetype: "Corporate", words: ["law firm", "attorney", "lawyer", "legal", "solicitor", "barrister", "notary", "conveyancing", "account", "bookkeep", "insurance", "financial", "mortgage", "wealth", "real estate", "realtor", "estate agent", "letting", "surveyor", "consult", "b2b", "logistics", "freight", "staffing", "recruit", "it support", "cyber", "managed service", "franchise", "funeral", "storage"] },
+
     // Hospitality and premium personal services: this is where Luxury belongs.
-    { archetype: "Luxury", words: ["fine dining", "restaurant", "steakhouse", "bistro", "brasserie", "wine", "cocktail", "med spa", "medspa", "day spa", "jewel", "boutique hotel", "resort", "aesthetic clinic", "luxury"] },
-    // Family-facing and food: approachable and bright.
-    { archetype: "Playful", words: ["bakery", "cafe", "café", "coffee", "food truck", "ice cream", "pizza", "kids", "children", "daycare", "preschool", "pet ", "dog ", "grooming", "veterinar", "toy", "party", "birthday"] },
-    // Creative portfolios: type-led.
-    { archetype: "Editorial", words: ["photograph", "portfolio", "designer", "studio", "architect", "gallery", "magazine", "writer", "film", "video production"] },
-    // Health and fitness: clean and energetic.
-    { archetype: "Minimal", words: ["dental", "dentist", "orthodont", "chiropract", "physio", "therap", "clinic", "medical", "doctor", "gym", "fitness", "yoga", "pilates", "personal train", "wellness"] },
-    // Technology.
-    { archetype: "Futuristic", words: ["saas", "software", "app development", "ai ", "crypto", "blockchain", "cyber", "data platform", "developer tool", "api "] },
+    { archetype: "Luxury", words: ["fine dining", "restaurant", "steakhouse", "bistro", "brasserie", "wine", "winery", "cocktail", "whisky", "med spa", "medspa", "day spa", "aesthetic clinic", "jewel", "boutique hotel", "hotel", "resort", "spa", "luxury", "bridal", "limousine", "chauffeur", "yacht", "interior design", "architect"] },
+
+    // Family-facing, food and pets: approachable and bright.
+    { archetype: "Playful", words: ["bakery", "cafe", "café", "coffee", "food truck", "ice cream", "pizza", "burger", "donut", "doughnut", "candy", "kids", "children", "childcare", "daycare", "preschool", "nursery", "kindergarten", "montessori", "nanny", "babysit", "soft play", "party", "balloon", "entertainer", "toy", "pet", "dog", "cat", "veterinar", "grooming", "kennel", "animal", "birthday"] },
+
+    // Creative and portfolio work: type-led, editorial.
+    { archetype: "Editorial", words: ["photograph", "videograph", "portfolio", "designer", "design studio", "creative studio", "architect", "gallery", "magazine", "writer", "copywriter", "film", "video production", "tattoo", "barber", "art", "ceramics", "furniture maker", "bespoke", "atelier", "music", "band", "recording studio", "record label"] },
+
+    // Health, fitness and clinical: clean, calm, uncluttered.
+    { archetype: "Minimal", words: ["dental", "dentist", "orthodont", "chiropract", "physio", "therap", "counsel", "clinic", "medical", "doctor", "optician", "pharmacy", "gym", "fitness", "yoga", "pilates", "personal train", "crossfit", "martial arts", "boxing", "climbing", "swim", "wellness", "nutrition", "dietitian", "massage", "acupuncture"] },
+
+    // Technology and anything selling a product rather than a service.
+    { archetype: "Futuristic", words: ["saas", "software", "app development", "platform", "crypto", "blockchain", "web3", "data", "developer tool", "api", "devops", "infrastructure", "automation", "robotics", "drone", "esports", "gaming"] },
+
+    // Loud, high-energy, youth-facing.
+    { archetype: "Bold", words: ["skate", "streetwear", "sneaker", "energy drink", "nightclub", "festival", "brewery", "taproom", "vape", "airsoft", "paintball", "go kart", "trampoline"] },
 ];
 
 /**
