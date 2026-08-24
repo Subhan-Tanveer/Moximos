@@ -182,9 +182,15 @@ export function tokensFor(archetype) {
  * a 375px phone, a container that never causes horizontal scroll, and a
  * reduced-motion block. None of this is left to the model any more.
  */
-export function baseStylesheet(archetype) {
+export function baseStylesheet(archetype, brand = "") {
     const t = tokensFor(archetype);
-    const vars = Object.entries(t.tokens).map(([k, v]) => `  ${k}: ${v};`).join("\n");
+    // The accent varies per brand so two businesses of the same type don't
+    // come out as the same website with different words. Everything else in
+    // the palette stays fixed — background, text and surfaces are what
+    // guarantee contrast, and those are not up for variation.
+    const accent = accentFor(t.name, brand);
+    const tokens = accent ? { ...t.tokens, "--accent": accent[0], "--accent-hover": accent[1] } : t.tokens;
+    const vars = Object.entries(tokens).map(([k, v]) => `  ${k}: ${v};`).join("\n");
 
     return `@import url('https://fonts.googleapis.com/css2?family=${t.googleFonts}&display=swap');
 
@@ -313,4 +319,46 @@ export function archetypeForBusiness(prompt) {
         if (words.some((w) => text.includes(w))) return archetype;
     }
     return null;
+}
+
+/*
+ * Accent variation within an archetype.
+ *
+ * Every business of the same type was coming out the same colour, so two
+ * roofers looked like the same website with different words — reported as
+ * "it always uses the same template and same design".
+ *
+ * Each archetype now carries several accents that all work against its
+ * background, chosen by a hash of the brand name. That means variety between
+ * businesses but STABILITY for one business: regenerating "David Tulloch
+ * Roofing" always produces the same green, so a client never sees their brand
+ * colour change under them.
+ *
+ * Only the accent moves. Background, text and surfaces stay fixed, because
+ * those are what guarantee contrast — letting a model or a hash loose on the
+ * whole palette is how you get unreadable pages.
+ */
+const ACCENT_VARIANTS = {
+    Luxury:     [["#c9a227", "#e0b93b"], ["#b08d57", "#c9a86c"], ["#9a8c98", "#b3a5b1"], ["#a63d40", "#c14f52"]],
+    Minimal:    [["#18181b", "#3f3f46"], ["#1d4ed8", "#1e40af"], ["#0f766e", "#0d5f59"], ["#b91c1c", "#991b1b"]],
+    Bold:       [["#ff4d17", "#e03d0c"], ["#0047ff", "#0038cc"], ["#ff2d87", "#e0246f"], ["#00a878", "#008c63"]],
+    Organic:    [["#5f7a4f", "#4c6440"], ["#8a6a3f", "#6f5533"], ["#3f6f6a", "#325854"], ["#8c5a3c", "#714830"]],
+    Corporate:  [["#1d4ed8", "#1e40af"], ["#0f766e", "#0d5f59"], ["#4338ca", "#3730a3"], ["#0369a1", "#075985"]],
+    Futuristic: [["#4de2f7", "#7cebfb"], ["#a78bfa", "#c4b5fd"], ["#34d399", "#6ee7b7"], ["#fb7185", "#fda4af"]],
+    Editorial:  [["#a8322d", "#8a2724"], ["#1f4e5f", "#173c49"], ["#5b3a86", "#472d69"], ["#2f6b3f", "#255432"]],
+    Playful:    [["#f2542d", "#d94420"], ["#7c3aed", "#6d28d9"], ["#0ea5e9", "#0284c7"], ["#e11d74", "#c0165f"]],
+};
+
+/**
+ * Deterministic accent for a brand: same name always yields the same colour.
+ */
+export function accentFor(archetype, brand = "") {
+    const list = ACCENT_VARIANTS[archetype];
+    if (!list || list.length === 0) return null;
+    let h = 2166136261;
+    for (let i = 0; i < brand.length; i++) {
+        h ^= brand.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return list[(h >>> 0) % list.length];
 }

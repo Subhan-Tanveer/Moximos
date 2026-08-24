@@ -307,20 +307,84 @@ export const SECTIONS = {
   </section>`,
 
     /*
-     * `linkColumns`, not `columns` — the schema originally used one name for
-     * two different shapes: cardGrid's column COUNT (a number) and the
-     * footer's link columns (an array). The model, reasonably, sent a number
-     * here and the footer died on `columns.map is not a function`, dropping
-     * the entire footer from an otherwise finished page. The field is renamed
-     * and both shapes are tolerated defensively, since a stray number should
-     * never again cost a whole section.
+     * Footer, in three hand-built variants.
+     *
+     * Previously there was exactly one footer and the model could only change
+     * its words. So "make the footer look better" was a request the system
+     * structurally could not satisfy — and the revision cheerfully reported
+     * "Done" while nothing visible changed. That is the worst kind of failure:
+     * the user is told their instruction was followed when it was ignored.
+     *
+     *   rich     (default) full agency footer — brand column, link columns,
+     *            contact block with real tel:/mailto:, opening hours, service
+     *            areas, social row, legal line. This is what people mean when
+     *            they say "a proper footer".
+     *   columns  the older compact version, for pages that want less weight.
+     *   centered a single centred stack — right for a one-CTA landing page.
+     *
+     * Variants are how design requests become actionable without letting a
+     * model near the layout: it picks from versions a human wrote, all of
+     * which are responsive and correct.
      */
-    footer: ({ brand, tagline, linkColumns, columns, contact, social = [], year = 2026 }) => {
-        const cols = Array.isArray(linkColumns) ? linkColumns : Array.isArray(columns) ? columns : [];
-        return SECTIONS.__footer({ brand, tagline, columns: cols, contact, social, year });
+    footer: (props) => {
+        const cols = Array.isArray(props.linkColumns) ? props.linkColumns : Array.isArray(props.columns) ? props.columns : [];
+        const variant = props.variant === "columns" || props.variant === "centered" ? props.variant : "rich";
+        return SECTIONS[`__footer_${variant}`]({ ...props, columns: cols });
     },
 
-    __footer: ({ brand, tagline, columns = [], contact, social = [], year = 2026 }) => `
+    __footer_rich: ({ brand, tagline, columns = [], contact, social = [], hours, serviceAreas = [], year = 2026 }) => {
+        const telHref = contact?.phone ? `tel:${String(contact.phone).replace(/[^\d+]/g, "")}` : null;
+        return `
+  <footer class="site-footer site-footer--rich">
+    <div class="container">
+      <div class="site-footer__top">
+        <div class="site-footer__brandcol">
+          <div class="site-footer__brand">${esc(brand)}</div>
+          ${tagline ? `<p class="site-footer__tagline">${esc(tagline)}</p>` : ""}
+          ${telHref ? `<a class="site-footer__phone" href="${esc(telHref)}">${esc(contact.phone)}</a>` : ""}
+          ${social.length ? `<div class="site-footer__social">${social.map((s) => `<a href="${esc(s.href)}" aria-label="${esc(s.label)}">${esc(s.label)}</a>`).join("")}</div>` : ""}
+        </div>
+
+        ${columns
+            .map(
+                (c) => `<nav class="site-footer__col" aria-label="${esc(c.title)}">
+          <h3 class="site-footer__heading">${esc(c.title)}</h3>
+          ${(c.links || []).map((l) => `<a class="site-footer__link" href="${esc(l.href)}">${esc(l.label)}</a>`).join("\n          ")}
+        </nav>`
+            )
+            .join("\n        ")}
+
+        ${
+            serviceAreas.length
+                ? `<div class="site-footer__col">
+          <h3 class="site-footer__heading">Areas served</h3>
+          <ul class="site-footer__areas">${serviceAreas.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>
+        </div>`
+                : ""
+        }
+
+        ${
+            contact || hours
+                ? `<div class="site-footer__col site-footer__contact">
+          <h3 class="site-footer__heading">Get in touch</h3>
+          ${contact?.address ? `<address class="site-footer__address">${esc(contact.address)}</address>` : ""}
+          ${telHref ? `<a class="site-footer__link" href="${esc(telHref)}">${esc(contact.phone)}</a>` : ""}
+          ${contact?.email ? `<a class="site-footer__link" href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : ""}
+          ${hours ? `<p class="site-footer__hours">${esc(hours)}</p>` : ""}
+        </div>`
+                : ""
+        }
+      </div>
+
+      <div class="site-footer__base">
+        <span>&copy; ${esc(year)} ${esc(brand)}. All rights reserved.</span>
+        <span class="site-footer__legal"><a href="#top">Back to top</a></span>
+      </div>
+    </div>
+  </footer>`;
+    },
+
+    __footer_columns: ({ brand, tagline, columns = [], contact, social = [], year = 2026 }) => `
   <footer class="site-footer">
     <div class="container site-footer__grid">
       <div>
@@ -331,7 +395,7 @@ export const SECTIONS = {
           .map(
               (c) => `<div>
         <div class="site-footer__heading">${esc(c.title)}</div>
-        ${c.links.map((l) => `<a class="site-footer__link" href="${esc(l.href)}">${esc(l.label)}</a>`).join("\n        ")}
+        ${(c.links || []).map((l) => `<a class="site-footer__link" href="${esc(l.href)}">${esc(l.label)}</a>`).join("\n        ")}
       </div>`
           )
           .join("\n      ")}
@@ -340,7 +404,7 @@ export const SECTIONS = {
               ? `<div>
         <div class="site-footer__heading">Contact</div>
         ${contact.address ? `<p class="site-footer__tagline">${esc(contact.address)}</p>` : ""}
-        ${contact.phone ? `<a class="site-footer__link" href="tel:${esc(contact.phone.replace(/[^\d+]/g, ""))}">${esc(contact.phone)}</a>` : ""}
+        ${contact.phone ? `<a class="site-footer__link" href="tel:${esc(String(contact.phone).replace(/[^\d+]/g, ""))}">${esc(contact.phone)}</a>` : ""}
         ${contact.email ? `<a class="site-footer__link" href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : ""}
       </div>`
               : ""
@@ -351,6 +415,23 @@ export const SECTIONS = {
       ${social.length ? `<span class="site-footer__social">${social.map((s) => `<a href="${esc(s.href)}">${esc(s.label)}</a>`).join("")}</span>` : ""}
     </div>
   </footer>`,
+
+    __footer_centered: ({ brand, tagline, contact, social = [], year = 2026 }) => {
+        const telHref = contact?.phone ? `tel:${String(contact.phone).replace(/[^\d+]/g, "")}` : null;
+        return `
+  <footer class="site-footer site-footer--centered">
+    <div class="container">
+      <div class="site-footer__brand">${esc(brand)}</div>
+      ${tagline ? `<p class="site-footer__tagline">${esc(tagline)}</p>` : ""}
+      ${telHref ? `<a class="site-footer__phone" href="${esc(telHref)}">${esc(contact.phone)}</a>` : ""}
+      ${social.length ? `<div class="site-footer__social">${social.map((s) => `<a href="${esc(s.href)}">${esc(s.label)}</a>`).join("")}</div>` : ""}
+      <div class="site-footer__base site-footer__base--centered">
+        <span>&copy; ${esc(year)} ${esc(brand)}. All rights reserved.</span>
+      </div>
+    </div>
+  </footer>`;
+    },
+
 };
 
 /* ─── Section-specific CSS ──────────────────────────────────── */
@@ -483,6 +564,65 @@ export const SECTION_CSS = `
 .faq__item[open] summary::after { transform: rotate(45deg); }
 .faq__item p { margin: .85rem 0 0; color: var(--text-muted); }
 
+
+/* ── Rich footer ─────────────────────────────────────────────
+   The brand column is wider than the link columns and the rest auto-fit, so
+   the footer looks composed with two link columns or with five. */
+.site-footer--rich { padding-block: clamp(3.5rem, 7vw, 6rem) 2rem; background: var(--surface); }
+.site-footer__top { display: grid; grid-template-columns: 1fr; gap: clamp(2rem, 4vw, 3.5rem); }
+@media (min-width: 640px)  { .site-footer__top { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1000px) { .site-footer__top { grid-template-columns: 1.6fr repeat(auto-fit, minmax(150px, 1fr)); } }
+
+.site-footer__brandcol { max-width: 34ch; }
+.site-footer__phone {
+  display: inline-block; margin-top: .85rem;
+  font-family: var(--font-display); font-size: clamp(1.2rem, 2.2vw, 1.55rem);
+  color: var(--accent); transition: color .2s ease;
+}
+.site-footer__phone:hover { color: var(--accent-hover); }
+
+.site-footer__col { min-width: 0; }
+.site-footer__col .site-footer__heading { margin-top: 0; }
+.site-footer__heading {
+  font-family: var(--font-body); font-size: .72rem; font-weight: 600;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--text-muted); margin: 0 0 1rem;
+}
+
+.site-footer__areas { list-style: none; margin: 0; padding: 0; }
+.site-footer__areas li { font-size: .925rem; color: var(--text-muted); margin-bottom: .5rem; }
+
+.site-footer__address { font-style: normal; font-size: .925rem; color: var(--text-muted); margin-bottom: .6rem; }
+.site-footer__hours { font-size: .875rem; color: var(--text-muted); margin: .75rem 0 0; }
+
+/* Underline grows from the left on hover rather than switching on abruptly. */
+.site-footer__link { position: relative; display: inline-block; font-size: .925rem; margin-bottom: .6rem; transition: color .2s ease; }
+.site-footer__link::after {
+  content: ""; position: absolute; left: 0; bottom: -2px;
+  width: 0; height: 1px; background: var(--accent); transition: width .25s ease;
+}
+.site-footer__link:hover { color: var(--accent); }
+.site-footer__link:hover::after { width: 100%; }
+
+.site-footer--rich .site-footer__social { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; }
+.site-footer--rich .site-footer__social a { font-size: .875rem; color: var(--text-muted); transition: color .2s ease; }
+.site-footer--rich .site-footer__social a:hover { color: var(--accent); }
+
+.site-footer--rich .site-footer__base {
+  display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;
+  margin-top: clamp(2.5rem, 5vw, 4rem); padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: .85rem; color: var(--text-muted);
+}
+.site-footer__legal a { transition: color .2s ease; }
+.site-footer__legal a:hover { color: var(--accent); }
+
+/* ── Centered footer ────────────────────────────────────────── */
+.site-footer--centered { text-align: center; padding-block: clamp(3rem, 6vw, 4.5rem) 2rem; }
+.site-footer--centered .site-footer__tagline { margin-inline: auto; }
+.site-footer--centered .site-footer__social { display: flex; justify-content: center; gap: 1.25rem; margin-top: 1.25rem; }
+.site-footer__base--centered { justify-content: center; border-top: 1px solid var(--border); margin-top: 2.5rem; padding-top: 1.5rem; }
+
 /* Footer */
 .site-footer { border-top: 1px solid var(--border); padding-block: clamp(3rem, 6vw, 4.5rem) 2rem; }
 .site-footer__grid { display: grid; grid-template-columns: 1fr; gap: 2.5rem; }
@@ -610,7 +750,7 @@ ${body}
 
     return {
         "/index.html": html,
-        "/styles.css": baseStylesheet(t.name) + SECTION_CSS + ART_CSS + MOTION_CSS,
+        "/styles.css": baseStylesheet(t.name, plan.brand || "") + SECTION_CSS + ART_CSS + MOTION_CSS,
         "/script.js": SECTION_JS,
         "/motion.js": MOTION_JS,
     };

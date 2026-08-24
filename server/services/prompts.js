@@ -647,7 +647,9 @@ Return a content plan as JSON matching the required schema.
 - "split"      — image beside copy. { id, eyebrow, title, body: [paragraph, paragraph], image, imageAlt, reverse, cta }
 - "testimonial"— one strong quote. { quote, author, role, image, imageAlt }
 - "ctaBand"    — closing conversion band. { id, title, subtitle, primaryCta, secondaryCta }
-- "footer"     — { brand, tagline, linkColumns: [{title, links: [{label, href}]}], contact: {address, phone, email}, social: [{label, href}] }
+- "footer"     — { variant, brand, tagline, linkColumns: [{title, links:[{label,href}]}], contact:{address, phone, email}, hours, serviceAreas:["City","City"], social:[{label,href}] }
+    * variant: "rich" (default, full agency footer — use this unless asked otherwise), "columns" (compact), "centered" (minimal, single CTA pages).
+    * FILL IT PROPERLY. A footer with only a brand name looks unfinished. Give it 2-3 linkColumns, the real address and phone, opening hours, and the towns served. This is where local businesses prove they are real.
 
 ## ORDER AND SELECTION
 Always start with "nav" and end with "footer", and always include exactly one hero and one "ctaBand".
