@@ -5,7 +5,7 @@
  * instead of whatever a model improvises. This is the piece that separates a
  * page that merely renders from one that feels built: a load sequence, headline
  * reveals split to the word, scroll-scrubbed parallax, staggered card entrances,
- * counting stats, a nav that reacts to scroll, and Lenis smoothing it together.
+ * counting stats, and a nav that reacts to scroll. Scrolling itself is native.
  *
  * THE RULE THIS FILE IS BUILT AROUND: content must never be stranded invisible.
  *
@@ -19,12 +19,11 @@
  * sometimes never fired.
  *
  * Uses only free GSAP: SplitText and ScrollSmoother are paid Club plugins, so
- * word-splitting is done manually below and smooth scroll comes from Lenis.
+ * word-splitting is done manually below. Scrolling is native — see start().
  */
 
 export const MOTION_CDN = `  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js" defer></script>`;
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>`;
 
 /* Only styles that are safe when JS never runs. Nothing here hides content. */
 export const MOTION_CSS = `
@@ -93,14 +92,25 @@ export const MOTION_JS = `/* Motion layer — see motionLayer.js. Safe by constr
     var gsap = window.gsap;
     gsap.registerPlugin(window.ScrollTrigger);
 
-    // ── Smooth scroll ─────────────────────────────────────────
-    // Lenis is optional; if it didn't load, native scrolling is fine.
-    if (window.Lenis && !reduced) {
-      var lenis = new window.Lenis({ duration: 1.05, smoothWheel: true });
-      lenis.on('scroll', window.ScrollTrigger.update);
-      gsap.ticker.add(function (t) { lenis.raf(t * 1000); });
-      gsap.ticker.lagSmoothing(0);
-    }
+    // ── Scrolling is NATIVE. Deliberately. ────────────────────
+    //
+    // This used to initialise Lenis smooth scroll. It was removed after real
+    // use: intercepting the wheel and interpolating scroll position makes the
+    // page feel like it is being dragged rather than scrolled, and when its
+    // interpolation fought ScrollTrigger the view would lurch to the bottom
+    // of the page. Reported as "it feels like I am pulling something heavy
+    // and then instantly it went to the footer".
+    //
+    // Smooth-scroll libraries are a portfolio-site flourish. On a lead
+    // generation page the visitor is trying to reach a phone number, and
+    // anything between their wheel and the page is friction working against
+    // the one thing the page exists to do. Native scroll is instant,
+    // matches every other site they use, respects OS accessibility settings,
+    // and never desynchronises from ScrollTrigger.
+    //
+    // Anchor links still glide, via a scroll-behavior:smooth rule in the base
+    // stylesheet — that is one CSS line the browser implements natively,
+    // with none of the wheel hijacking.
 
     // Reduced motion: no animation at all, but ensure everything is visible
     // and the scroll-dependent classes still behave.
@@ -275,12 +285,9 @@ export const MOTION_JS = `/* Motion layer — see motionLayer.js. Safe by constr
   }
 
   /* Header gains depth once the page has moved.
-     Driven by ScrollTrigger where available, NOT by a bare scroll listener:
-     Lenis takes over scrolling and a programmatic scroll doesn't reliably
-     emit a native 'scroll' event, so the class silently never applied
-     (measured: scrollY 3193, class absent). ScrollTrigger is already
-     synchronised with Lenis via the ticker above, so it always sees the
-     real position. The native listener stays as the no-GSAP fallback. */
+     Driven by ScrollTrigger where available, with a plain scroll listener as
+     the fallback for when GSAP never loaded. Both read the real scroll
+     position now that scrolling is native. */
   function initNavState() {
     var header = document.querySelector('.site-header');
     if (!header) return;
