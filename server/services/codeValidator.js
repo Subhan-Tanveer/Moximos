@@ -127,6 +127,12 @@ export function validateAndFixCode(code, filePath, context) {
             return tag;
         });
 
+        // Tailwind fails silently, so invented utilities have to be repaired
+        // rather than reported.
+        const tw = repairTailwindClasses(code, filePath);
+        code = tw.code;
+        warnings.push(...tw.warnings);
+
         // Inject the guard script whenever the page could hide content. It
         // pairs with guardHiddenRules() in the stylesheet.
         if (/<\/head>/i.test(code) && !code.includes("anim-ready")) {
@@ -517,3 +523,141 @@ const ANIM_READY_SCRIPT = `  <script>
       else window.addEventListener('load', rescue);
     })();
   </script>`;
+
+/*
+ * Repair Tailwind classes that do not exist.
+ *
+ * Tailwind fails SILENTLY. An invented utility is not an error, it is simply
+ * nothing — which makes this the hardest class of bug for a model to notice
+ * and the easiest for a user to see. All three of these shipped on one live
+ * page and between them produced a broken header:
+ *
+ *   <nav class="hidden md:flex space-between w-full">
+ *     <ul class="text-lg font-medium space-x-6">
+ *       <li><a class="text-white hover:text-gold">About</a></li>
+ *
+ *   1. `space-between` is not a class. It is `justify-between`. So nothing
+ *      was justified.
+ *   2. `space-x-6` sets margins between siblings, but the <ul> was not flex,
+ *      so the <li> kept their default block layout and the links STACKED
+ *      vertically. This is the "nav is stacked" report, again.
+ *   3. `text-gold` is not in the default palette, so no colour was applied
+ *      and the "Book Consultation" link inherited dark text on a dark
+ *      background — invisible.
+ *
+ * Each is deterministic to detect and fix, which is the only kind of
+ * guarantee that has held up in this pipeline.
+ */
+
+// Utilities models reach for that read like CSS property values rather than
+// Tailwind class names.
+const INVALID_UTILITY_MAP = {
+    "space-between": "justify-between",
+    "space-around": "justify-around",
+    "space-evenly": "justify-evenly",
+    "align-center": "items-center",
+    "align-start": "items-start",
+    "align-end": "items-end",
+    "justify-content-between": "justify-between",
+    "align-items-center": "items-center",
+    "flex-column": "flex-col",
+    "text-centre": "text-center",
+    "font-weight-bold": "font-bold",
+};
+
+// Tailwind's default colour names. Anything else used as text-X / bg-X /
+// border-X is a custom token that needs defining or it renders as nothing.
+// Suffixes that follow text-/border-/from- but are NOT colours. Without this,
+// `text-lg` (a font size) was detected as a custom colour named "lg" and
+// solemnly defined as gold.
+const NON_COLOR_SUFFIXES = new Set([
+    "xs", "sm", "base", "lg", "xl", "left", "right", "center", "justify", "start", "end",
+    "wrap", "nowrap", "balance", "pretty", "ellipsis", "clip", "top", "bottom", "middle",
+    "solid", "dashed", "dotted", "double", "none", "hidden", "collapse", "separate", "auto",
+]);
+
+const TAILWIND_COLORS = new Set([
+    "inherit", "current", "transparent", "black", "white",
+    "slate", "gray", "grey", "zinc", "neutral", "stone",
+    "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal",
+    "cyan", "sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose",
+]);
+
+// Sensible values for the custom colour names models invent most often, so a
+// defined token looks like what it is named rather than a random hue.
+const CUSTOM_COLOR_VALUES = {
+    gold: "#c9a227", champagne: "#e8d9a0", cream: "#f5f0e6", ivory: "#fffff0",
+    charcoal: "#2b2b2e", ink: "#12121a", midnight: "#0b1020", onyx: "#0a0a0a",
+    sand: "#e3d5c0", clay: "#b06a4a", sage: "#7a8b6f", forest: "#2f4f3a",
+    rust: "#a3492b", brass: "#b08d57", copper: "#b87333", silver: "#c0c0c0",
+    navy: "#12233f", burgundy: "#5c1a2b", olive: "#6b7245", mint: "#a8e0c8",
+    coral: "#ff6f5e", lavender: "#c3b1e1", peach: "#ffd9b3", plum: "#5b3a6b",
+};
+
+function repairTailwindClasses(code, filePath) {
+    const warnings = [];
+    const customColors = new Set();
+    let renamed = 0;
+    let flexAdded = 0;
+
+    code = code.replace(/class=(["'])([^"']*)\1/gi, (match, q, classes) => {
+        let list = classes.split(/\s+/).filter(Boolean);
+
+        // 1. Rename utilities that do not exist.
+        list = list.map((cls) => {
+            // Preserve any responsive/state prefix: md:space-between.
+            const m = cls.match(/^((?:[a-z-]+:)*)([\w-]+)$/);
+            if (!m) return cls;
+            const [, prefix, base] = m;
+            const fixed = INVALID_UTILITY_MAP[base];
+            if (!fixed) return cls;
+            renamed++;
+            return prefix + fixed;
+        });
+
+        // 2. space-x-* only reads as a row if the children are laid out in
+        //    one. Without flex or grid the siblings keep block layout and
+        //    stack — which is exactly how a horizontal nav became a column.
+        const hasSpaceX = list.some((c) => /(^|:)space-x-/.test(c));
+        const hasLayout = list.some((c) => /(^|:)(flex|inline-flex|grid|inline-grid)$/.test(c));
+        if (hasSpaceX && !hasLayout) {
+            list.unshift("flex", "items-center");
+            flexAdded++;
+        }
+
+        // 3. Collect custom colour tokens so they can be defined below.
+        for (const cls of list) {
+            const m = cls.match(/(?:^|:)(?:text|bg|border|ring|from|via|to)-([a-z]+)(?:-\d{2,3})?$/);
+            if (m && !TAILWIND_COLORS.has(m[1]) && !NON_COLOR_SUFFIXES.has(m[1]) && !/^\[/.test(m[1])) {
+                customColors.add(m[1]);
+            }
+        }
+
+        return `class=${q}${list.join(" ")}${q}`;
+    });
+
+    if (renamed > 0) warnings.push(`${filePath}: renamed ${renamed} non-existent Tailwind utility class(es) (e.g. space-between → justify-between) — they were silently doing nothing`);
+    if (flexAdded > 0) warnings.push(`${filePath}: added flex to ${flexAdded} container(s) using space-x-* without a row layout — their children were stacking vertically`);
+
+    // 4. Define the custom colour tokens. Undefined ones render as no colour
+    //    at all, which is how a link ended up invisible on its own background.
+    if (customColors.size > 0 && /cdn\.tailwindcss\.com/.test(code) && !/tailwind\.config\s*=/.test(code)) {
+        const entries = [...customColors]
+            .map((name) => `        '${name}': '${CUSTOM_COLOR_VALUES[name] || "#c9a227"}'`)
+            .join(",\n");
+        const cfg = `  <script>
+    /* Injected: these colour tokens are used in the markup but are not part of
+       Tailwind's default palette, so without this they apply NO colour at all
+       and the element inherits whatever it sits on — which made a CTA
+       invisible against its own background. */
+    tailwind.config = { theme: { extend: { colors: {
+${entries}
+    } } } };
+  </script>`;
+        // Must come AFTER the CDN script, which defines `tailwind`.
+        code = code.replace(/(<script[^>]*cdn\.tailwindcss\.com[^>]*><\/script>)/i, `$1\n${cfg}`);
+        warnings.push(`${filePath}: defined ${customColors.size} custom Tailwind colour(s) (${[...customColors].join(", ")}) that were used but never configured`);
+    }
+
+    return { code, warnings };
+}
