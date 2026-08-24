@@ -191,10 +191,28 @@ const MIN_ANIMATABLE_CHARS = 120;
 const CALL_TIMEOUT_MS = parseInt(process.env.AI_CALL_TIMEOUT_MS || "90000", 10);
 const PLAN_TIMEOUT_MS = parseInt(process.env.AI_PLAN_TIMEOUT_MS || "120000", 10);
 
-// Kill switch for the section-library path. Set AI_USE_SECTION_LIBRARY=false
-// to send every project through free-form generation instead — useful for
-// comparing the two paths on the same prompt.
-const USE_SECTION_LIBRARY = process.env.AI_USE_SECTION_LIBRARY !== "false";
+/*
+ * Free-form generation is the DEFAULT, by explicit product decision.
+ *
+ * The section library rendered every page from hand-written templates, which
+ * made layout, motion and structure reliable but meant two businesses of the
+ * same type came out as the same page with different words, and a request to
+ * restyle a section could not be honoured because the section was fixed.
+ *
+ * The owner chose variety and instruction-following over that reliability:
+ * the model designs each page itself, writes its own CSS, its own GSAP
+ * choreography and its own WebGL scene where it fits.
+ *
+ * What did NOT go away is the deterministic safety net. Those are bug
+ * catchers, not templates: the structuredOutputs fix (without which every
+ * file truncates at 1024 chars), esbuild syntax verification, npm package
+ * existence checks, escaping repair, the verified image catalog, Tailwind
+ * injection, and responsive-heading repair. Removing those would not give
+ * the model more freedom, only more broken output.
+ *
+ * Set AI_USE_SECTION_LIBRARY=true to render from templates again.
+ */
+const USE_SECTION_LIBRARY = process.env.AI_USE_SECTION_LIBRARY === "true";
 
 /*
  * Output token ceiling — the single most damaging bug found in this file.
@@ -268,6 +286,35 @@ function isTransientServerError(err) {
     return /^gone$/i.test((err?.message || "").trim());
 }
 
+/*
+ * 401/403 is a dead end, not a transient failure.
+ *
+ * Trying the next model is pointless — every model on the chain uses the same
+ * credential, so a rejected key rejects all three, and the user waits through
+ * the full timeout budget to be told "Forbidden", which explains nothing.
+ *
+ * Seen live: NVIDIA returned 403 "Authorization failed" on every request once
+ * the free-tier credits ran out. The generation failed with a bare
+ * "Forbidden" and nothing pointed at the actual cause or the fix.
+ */
+function isAuthError(err) {
+    const status = err?.statusCode || err?.status;
+    if (status === 401 || status === 403) return true;
+    return /forbidden|unauthorized|authorization failed|invalid api key/i.test(err?.message || "");
+}
+
+class AiAuthError extends Error {
+    constructor() {
+        super(
+            "The NVIDIA API key was rejected (403 Authorization failed). " +
+                "This is usually exhausted free-tier credits or a revoked key — not a problem with the site being generated. " +
+                "Check the key at build.nvidia.com, then update NVIDIA_API_KEY in .env and restart the server."
+        );
+        this.name = "AiAuthError";
+        this.status = 502;
+    }
+}
+
 // Tries each model in MODEL_CHAIN in order, moving to the next one as soon
 // as a model proves unusable (rate-limited) or unreliable (repeated
 // timeouts / unparsable output) rather than retrying a single provider
@@ -288,6 +335,10 @@ export async function callWithFallback(label, timeoutMs, buildCallFn, chain = MO
             return await buildCallFn(model, AbortSignal.timeout(budget));
         } catch (err) {
             lastErr = err;
+            // A rejected credential fails identically on every model, so stop
+            // immediately with a message that names the real cause.
+            if (isAuthError(err)) throw new AiAuthError();
+
             const timedOut = isTimeoutError(err);
             const unparsable = NoObjectGeneratedError.isInstance(err);
             const rateLimited = isRateLimitError(err);
