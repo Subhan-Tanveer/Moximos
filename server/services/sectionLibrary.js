@@ -253,6 +253,160 @@ export const SECTIONS = {
     </div>
   </section>`,
 
+    /*
+     * Pricing tiers. Only for businesses genuinely sold in tiers — a
+     * subscription, a membership, a package. A roofer does not have tiers,
+     * and a three-column pricing table on a contractor's site reads as a
+     * template nobody edited.
+     */
+    pricing: ({ id = "pricing", eyebrow, title, intro, items = [] }) => `
+  <section class="section" id="${esc(id)}">
+    <div class="container">
+      <div class="section__head reveal">
+        ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ""}
+        <h2>${esc(title)}</h2>
+        ${intro ? `<p class="lede">${esc(intro)}</p>` : ""}
+      </div>
+      <div class="pricing">
+        ${items
+            .map(
+                (t) => `<article class="pricing__tier reveal${t.featured ? " pricing__tier--featured" : ""}">
+          ${t.featured ? `<span class="pricing__badge">Most popular</span>` : ""}
+          <h3>${esc(t.title)}</h3>
+          <div class="pricing__price">${esc(t.value || "")}${t.meta ? `<span>${esc(t.meta)}</span>` : ""}</div>
+          ${t.body ? `<p>${esc(t.body)}</p>` : ""}
+          ${Array.isArray(t.features) && t.features.length ? `<ul class="pricing__features">${t.features.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}
+          ${t.cta ? `<a class="btn ${t.featured ? "btn--primary" : "btn--ghost"}" href="${esc(t.cta.href || "#contact")}">${esc(t.cta.label)}</a>` : ""}
+        </article>`
+            )
+            .join("\n        ")}
+      </div>
+    </div>
+  </section>`,
+
+    /*
+     * A real menu — name, dotted leader, price. The dot leader is what makes
+     * a price list read like a menu rather than a feature grid, and it is
+     * pure CSS.
+     */
+    menu: ({ id = "menu", eyebrow, title, intro, groups = [], items = [] }) => {
+        const sets = groups.length ? groups : [{ title: "", items }];
+        return `
+  <section class="section section--surface" id="${esc(id)}">
+    <div class="container">
+      <div class="section__head reveal">
+        ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ""}
+        <h2>${esc(title)}</h2>
+        ${intro ? `<p class="lede">${esc(intro)}</p>` : ""}
+      </div>
+      <div class="menu-groups">
+        ${sets
+            .map(
+                (g) => `<div class="menu-group reveal">
+          ${g.title ? `<h3 class="menu-group__title">${esc(g.title)}</h3>` : ""}
+          <ul class="menu-list">
+            ${(g.items || [])
+                .map(
+                    (it) => `<li class="menu-item">
+              <div class="menu-item__head">
+                <span class="menu-item__name">${esc(it.title)}</span>
+                <span class="menu-item__dots" aria-hidden="true"></span>
+                <span class="menu-item__price">${esc(it.value || it.meta || "")}</span>
+              </div>
+              ${it.body ? `<p class="menu-item__desc">${esc(it.body)}</p>` : ""}
+            </li>`
+                )
+                .join("\n            ")}
+          </ul>
+        </div>`
+            )
+            .join("\n        ")}
+      </div>
+    </div>
+  </section>`;
+    },
+
+    /* People. Agencies, clinics, salons and studios sell the individuals. */
+    team: ({ id = "team", eyebrow, title, intro, items = [] }) => `
+  <section class="section" id="${esc(id)}">
+    <div class="container">
+      <div class="section__head reveal">
+        ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ""}
+        <h2>${esc(title)}</h2>
+        ${intro ? `<p class="lede">${esc(intro)}</p>` : ""}
+      </div>
+      <div class="team">
+        ${items
+            .map(
+                (p) => `<figure class="team__member reveal">
+          ${p.image ? img(p.image, p.imageAlt || p.title, { ratio: "3 / 4" }) : `<div class="team__placeholder" aria-hidden="true">${esc((p.title || "?").charAt(0))}</div>`}
+          <figcaption>
+            <span class="team__name">${esc(p.title)}</span>
+            ${p.meta ? `<span class="team__role">${esc(p.meta)}</span>` : ""}
+            ${p.body ? `<p class="team__bio">${esc(p.body)}</p>` : ""}
+          </figcaption>
+        </figure>`
+            )
+            .join("\n        ")}
+      </div>
+    </div>
+  </section>`,
+
+    /* Trust band. Text marks, not images — a generated site has no rights to
+       anyone's logo, and inventing them would be dishonest. */
+    logos: ({ eyebrow, items = [] }) => {
+        const list = items.map((i) => (typeof i === "string" ? i : i.title || "")).filter(Boolean);
+        if (!list.length) return "";
+        return `
+  <section class="section--tight logos">
+    <div class="container">
+      ${eyebrow ? `<p class="eyebrow logos__label">${esc(eyebrow)}</p>` : ""}
+      <div class="logos__row">${list.map((l) => `<span class="logos__mark">${esc(l)}</span>`).join("")}</div>
+    </div>
+  </section>`;
+    },
+
+    /*
+     * Contact section with a real form.
+     *
+     * The form posts nowhere by default — there is no backend for a generated
+     * site, and a form that silently discards a lead is worse than no form.
+     * So `action` must be supplied (Formspree, Basin, the client's own
+     * handler); without it the form is omitted entirely and the phone and
+     * email remain, which do work.
+     */
+    contact: ({ id = "contact", eyebrow, title, intro, action, phone, email, address, hours }) => {
+        const telHref = phone ? `tel:${String(phone).replace(/[^\d+]/g, "")}` : null;
+        return `
+  <section class="section" id="${esc(id)}">
+    <div class="container grid grid--2 contact">
+      <div class="contact__info reveal">
+        ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ""}
+        <h2>${esc(title)}</h2>
+        ${intro ? `<p class="lede">${esc(intro)}</p>` : ""}
+        <dl class="contact__details">
+          ${telHref ? `<div><dt>Phone</dt><dd><a href="${esc(telHref)}">${esc(phone)}</a></dd></div>` : ""}
+          ${email ? `<div><dt>Email</dt><dd><a href="mailto:${esc(email)}">${esc(email)}</a></dd></div>` : ""}
+          ${address ? `<div><dt>Address</dt><dd>${esc(address)}</dd></div>` : ""}
+          ${hours ? `<div><dt>Hours</dt><dd>${esc(hours)}</dd></div>` : ""}
+        </dl>
+      </div>
+      ${
+          action
+              ? `<form class="contact__form reveal" method="POST" action="${esc(action)}">
+        <label>Name<input type="text" name="name" required autocomplete="name"></label>
+        <label>Email<input type="email" name="email" required autocomplete="email"></label>
+        <label>Phone<input type="tel" name="phone" autocomplete="tel"></label>
+        <label>How can we help?<textarea name="message" rows="4" required></textarea></label>
+        <button class="btn btn--primary" type="submit">Send enquiry</button>
+      </form>`
+              : ""
+      }
+    </div>
+  </section>`;
+    },
+
+
     /** Numbers band — credibility without a wall of text. */
     stats: ({ items = [] }) => `
   <section class="section--tight section--surface stats">
@@ -601,6 +755,93 @@ export const SECTION_CSS = `
 .hero-3d__title .tone { color: var(--accent); }
 .hero--3d .hero__lede { margin-inline: auto; }
 .hero--3d .hero__actions { justify-content: center; }
+
+
+/* ── Pricing ─────────────────────────────────────────────── */
+.pricing { display: grid; grid-template-columns: 1fr; gap: clamp(1.25rem, 2.5vw, 2rem); align-items: start; }
+@media (min-width: 700px)  { .pricing { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1000px) { .pricing { grid-template-columns: repeat(3, 1fr); } }
+.pricing__tier {
+  position: relative; display: flex; flex-direction: column; gap: .85rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: clamp(1.5rem, 3vw, 2.25rem);
+  transition: transform .3s ease, border-color .3s ease;
+}
+.pricing__tier:hover { transform: translateY(-4px); border-color: var(--accent); }
+/* The featured tier lifts on desktop only — on mobile the columns stack, and
+   a raised middle card just looks misaligned. */
+.pricing__tier--featured { border-color: var(--accent); box-shadow: var(--shadow); }
+@media (min-width: 1000px) { .pricing__tier--featured { transform: translateY(-12px); } }
+.pricing__badge {
+  position: absolute; top: -.75rem; left: clamp(1.5rem, 3vw, 2.25rem);
+  background: var(--accent); color: var(--accent-contrast);
+  font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  padding: .3rem .7rem; border-radius: 999px;
+}
+.pricing__tier h3 { margin: 0; }
+.pricing__price { font-family: var(--font-display); font-size: clamp(2rem, 4vw, 2.75rem); line-height: 1; color: var(--accent); }
+.pricing__price span { font-family: var(--font-body); font-size: .85rem; color: var(--text-muted); margin-left: .35rem; }
+.pricing__tier p { margin: 0; color: var(--text-muted); }
+.pricing__features { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+.pricing__features li { position: relative; padding-left: 1.5rem; font-size: .925rem; }
+.pricing__features li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+.pricing__tier .btn { margin-top: auto; }
+
+/* ── Menu (price list) ───────────────────────────────────── */
+.menu-groups { display: grid; grid-template-columns: 1fr; gap: clamp(2rem, 4vw, 3.5rem); }
+@media (min-width: 800px) { .menu-groups { grid-template-columns: repeat(2, 1fr); } }
+.menu-group__title { font-size: 1.15rem; padding-bottom: .6rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+.menu-list { list-style: none; margin: 0; padding: 0; }
+.menu-item { margin-bottom: 1.35rem; }
+/* The dotted leader is what makes this read as a menu. Flex lets the dots
+   consume whatever space is left between name and price at any width. */
+.menu-item__head { display: flex; align-items: baseline; gap: .5rem; }
+.menu-item__name { font-family: var(--font-display); font-size: 1.05rem; }
+.menu-item__dots { flex: 1; border-bottom: 1px dotted var(--border); transform: translateY(-.25rem); }
+.menu-item__price { font-family: var(--font-display); color: var(--accent); white-space: nowrap; }
+.menu-item__desc { margin: .3rem 0 0; font-size: .9rem; color: var(--text-muted); max-width: 46ch; }
+
+/* ── Team ────────────────────────────────────────────────── */
+.team { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(1.25rem, 3vw, 2.25rem); }
+@media (min-width: 900px) { .team { grid-template-columns: repeat(4, 1fr); } }
+.team__member { margin: 0; }
+.team__placeholder {
+  display: grid; place-items: center; aspect-ratio: 3 / 4;
+  background: var(--surface-2); border-radius: var(--radius-lg);
+  font-family: var(--font-display); font-size: 2.5rem; color: var(--accent);
+}
+.team__member figcaption { display: block; margin-top: .85rem; }
+.team__name { display: block; font-family: var(--font-display); font-size: 1.05rem; }
+.team__role { display: block; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-top: .2rem; }
+.team__bio { margin: .5rem 0 0; font-size: .9rem; color: var(--text-muted); }
+
+/* ── Logos / trust band ──────────────────────────────────── */
+.logos { border-block: 1px solid var(--border); }
+.logos__label { text-align: center; margin-bottom: 1.25rem; }
+.logos__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: clamp(1.5rem, 4vw, 3.5rem); }
+.logos__mark {
+  font-family: var(--font-display); font-size: clamp(1rem, 1.8vw, 1.35rem);
+  color: var(--text-muted); opacity: .75; transition: opacity .25s ease, color .25s ease;
+}
+.logos__mark:hover { opacity: 1; color: var(--text); }
+
+/* ── Contact ─────────────────────────────────────────────── */
+.contact { align-items: start; }
+.contact__details { display: grid; gap: 1rem; margin: 2rem 0 0; }
+.contact__details dt { font-size: .7rem; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); }
+.contact__details dd { margin: .2rem 0 0; font-size: 1.05rem; }
+.contact__details a { color: var(--accent); }
+.contact__form { display: grid; gap: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: clamp(1.5rem, 3vw, 2.25rem); }
+.contact__form label { display: grid; gap: .4rem; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.contact__form input, .contact__form textarea {
+  font: inherit; font-size: 1rem; text-transform: none; letter-spacing: normal;
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .75rem .9rem; width: 100%;
+  transition: border-color .2s ease;
+}
+.contact__form input:focus, .contact__form textarea:focus { outline: none; border-color: var(--accent); }
+.contact__form textarea { resize: vertical; }
 
 /* ── Rich footer ─────────────────────────────────────────────
    The brand column is wider than the link columns and the rest auto-fit, so

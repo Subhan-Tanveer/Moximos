@@ -644,6 +644,16 @@ Return a content plan as JSON matching the required schema.
 - "gallery"     — image grid for work, before/after, or dishes. { id, eyebrow, title, intro, items: [{image, imageAlt, title, meta}] }
 - "process"     — 4 connected steps. { id, eyebrow, title, intro, items: [{title, body}] } — ideal for service businesses explaining how a job runs.
 - "faq"         — collapsible questions. { id, eyebrow, title, items: [{title, body}] } — title is the question, body the answer.
+- "pricing"     — tiered plans. { id, eyebrow, title, intro, items: [{title, value:"$29", meta:"/mo", body, features:["..."], featured:true, cta:{label,href}}] }
+    * ONLY for things genuinely sold in tiers: a subscription, membership, retainer, class pass. A roofer, plumber or restaurant has no tiers — use a numberedList with a "from £X" meta instead. Mark one tier featured.
+- "menu"        — a real price list with dotted leaders. { id, eyebrow, title, intro, groups: [{title:"Starters", items:[{title, value:"£14", body}]}] }
+    * Restaurants, cafes, salons, barbers, spas, tattoo studios — anything with a priced list of offerings.
+- "team"        — the people. { id, eyebrow, title, intro, items: [{title:"Name", meta:"Role", body, image, imageAlt}] }
+    * Agencies, clinics, salons, studios and firms where clients pick the person as much as the business.
+- "logos"       — trust band of client or partner NAMES as text. { eyebrow:"Trusted by", items: ["Northwind","Globex"] }
+    * B2B and professional services only, and only with names the request actually supplies. Never invent client names.
+- "contact"     — contact details beside an enquiry form. { id, eyebrow, title, intro, action, phone, email, address, hours }
+    * action is the form endpoint (Formspree etc). If the request gives no endpoint, LEAVE IT OUT — the form is then omitted and the phone and email remain, which do work. A form that silently discards a lead is worse than no form.
 - "stats"      — four-number credibility band. { items: [{value, label}] } — value short ("15", "400+", "4.9")
 - "cardGrid"   — services / menu / features. { id, eyebrow, title, intro, columns, items: [{title, body, meta, image, imageAlt}] }
 - "split"      — image beside copy. { id, eyebrow, title, body: [paragraph, paragraph], image, imageAlt, reverse, cta }
@@ -657,6 +667,16 @@ Return a content plan as JSON matching the required schema.
 Always start with "nav" and end with "footer", and always include exactly one hero and one "ctaBand".
 Between them choose ONLY what this business genuinely needs. A restaurant needs a menu cardGrid; a contractor needs a services cardGrid and a trust-building stats band; a portfolio needs a gallery-style cardGrid. Do not include a section just because it exists.
 Six to nine sections total is right for a landing page.
+MATCH THE SECTIONS TO THE TRADE. This is the single biggest difference between a page that fits a business and a template someone forgot to edit:
+  restaurant / cafe / bakery  → heroImage, menu, split (the story), testimonial, contact
+  tattoo / salon / barber     → heroEditorial, gallery, team, menu (price list), faq, contact
+  contractor / trades         → heroImage, numberedList, stats, process, testimonial, faq, ctaBand
+  SaaS / tech / agency        → hero3d, logos, numberedList, pricing, faq, ctaBand
+  clinic / dental / medical   → heroSplit, numberedList, team, faq, contact
+  gym / studio / class        → heroImage, pricing (class passes), process, testimonial, contact
+  portfolio / photographer    → heroEditorial, gallery, split, contact
+  retail / shop               → heroImage, gallery, split, faq, contact
+
 Vary the shapes — do not use cardGrid for everything. A page reads as designed when its sections differ: a numberedList for services, a process for how the work runs, a gallery for proof, a marquee for service areas, an artBand to break up long stretches.
 Prefer "heroEditorial" when the business sells craft or taste, "heroImage" when a photograph does the selling, "heroSplit" when a single product or person is the subject.
 

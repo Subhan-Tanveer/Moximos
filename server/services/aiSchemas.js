@@ -94,6 +94,9 @@ const SectionItemSchema = z.object({
     image: z.string().optional(),
     imageAlt: z.string().optional(),
     value: z.string().optional(),
+    featured: z.boolean().optional(),
+    features: z.array(z.string()).optional(),
+    cta: z.object({ label: z.string(), href: z.string() }).optional(),
     label: z.string().optional(),
 });
 
@@ -104,7 +107,7 @@ export const ContentPlanSchema = z.object({
     styleArchetype: z.enum(["Luxury", "Minimal", "Bold", "Organic", "Corporate", "Playful", "Editorial", "Futuristic"]),
     sections: z.array(
         z.object({
-            type: z.enum(["nav", "heroImage", "heroSplit", "heroEditorial", "hero3d", "artBand", "numberedList", "marquee", "gallery", "process", "faq", "stats", "cardGrid", "split", "testimonial", "ctaBand", "footer"]),
+            type: z.enum(["nav", "heroImage", "heroSplit", "heroEditorial", "hero3d", "artBand", "numberedList", "marquee", "gallery", "process", "faq", "pricing", "menu", "team", "logos", "contact", "stats", "cardGrid", "split", "testimonial", "ctaBand", "footer"]),
             id: z.string().optional(),
             variant: z.string().optional(),
             hours: z.string().optional(),
@@ -129,6 +132,11 @@ export const ContentPlanSchema = z.object({
             author: z.string().optional(),
             role: z.string().optional(),
             items: z.array(SectionItemSchema).optional(),
+            groups: z.array(z.object({ title: z.string().optional(), items: z.array(SectionItemSchema) })).optional(),
+            action: z.string().optional(),
+            phone: z.string().optional(),
+            email: z.string().optional(),
+            address: z.string().optional(),
             links: z.array(LinkSchema).optional(),
             linkColumns: z.array(z.object({ title: z.string(), links: z.array(LinkSchema) })).optional(),
             social: z.array(LinkSchema).optional(),
