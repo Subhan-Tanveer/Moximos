@@ -26,6 +26,7 @@ import LeadSearch from "./components/LeadSearch";
 import LivePreview from "./components/LivePreview";
 import { exportProjectZip } from "./utils/exportProject";
 import { detectDependencies } from "./utils/sandpackUtils";
+import { useAutoGrow } from "./utils/useAutoGrow";
 
 const STARTER_PROMPTS = [
     "A landing page for a roofing company in Austin, TX",
@@ -70,6 +71,8 @@ export default function AppShell() {
     const [paneView, setPaneView] = useState("preview");
     const [exporting, setExporting] = useState(false);
     const [promptDraft, setPromptDraft] = useState("");
+    // Grows with the brief instead of scrolling a three-line box.
+    const promptRef = useAutoGrow(promptDraft, 280);
     const [creating, setCreating] = useState(false);
     const [view, setView] = useState("projects"); // "projects" | "leads"
 
@@ -587,6 +590,7 @@ export default function AppShell() {
                             >
                                 <div className="glass-panel flex flex-col gap-3 rounded-2xl p-3 transition-colors duration-300 focus-within:border-violet/50">
                                     <textarea
+                                        ref={promptRef}
                                         value={promptDraft}
                                         onChange={(e) => setPromptDraft(e.target.value)}
                                         onKeyDown={(e) => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useAutoGrow } from "../utils/useAutoGrow";
 import { ArrowLeft, ArrowUp, FileText, Loader2, Paperclip, Sparkles, X } from "lucide-react";
 import api from "../api";
 
@@ -56,6 +57,8 @@ function readFileAsText(file) {
  */
 export default function AiCodeEditor({ project, onProjectUpdated, onClose, embedded = false }) {
     const [draft, setDraft] = useState("");
+    // Chat box grows too, but capped lower — it shares a narrow sidebar.
+    const draftRef = useAutoGrow(draft, 180);
     const [pendingFiles, setPendingFiles] = useState([]);
     const [attachError, setAttachError] = useState("");
     const [sending, setSending] = useState(false);
@@ -301,6 +304,7 @@ export default function AiCodeEditor({ project, onProjectUpdated, onClose, embed
                             <Paperclip size={15} />
                         </button>
                         <textarea
+                            ref={draftRef}
                             value={draft}
                             onChange={(e) => setDraft(e.target.value)}
                             onKeyDown={(e) => {
