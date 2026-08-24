@@ -19,6 +19,7 @@
 import { baseStylesheet, tokensFor } from "./designTokens.js";
 import { MOTION_CDN, MOTION_CSS, MOTION_JS } from "./motionLayer.js";
 import { ART_CSS, artFor, seedFrom } from "./svgArt.js";
+import { WEBGL_CDN, WEBGL_CSS, WEBGL_JS, sceneFor } from "./webglScenes.js";
 
 const esc = (s = "") =>
     String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -102,6 +103,33 @@ export const SECTIONS = {
           ${ctas(primaryCta, secondaryCta)}
         </div>
         ${meta.length ? `<dl class="hero-editorial__meta">${meta.map((m) => `<div><dt>${esc(m.label)}</dt><dd>${esc(m.value)}</dd></div>`).join("")}</dl>` : ""}
+      </div>
+    </div>
+  </section>`,
+
+    /*
+     * Hero with a live WebGL backdrop.
+     *
+     * The scene is chosen from the archetype, never supplied by the model —
+     * it has no way to know which motion suits which brand, and no way to
+     * write a render loop that is safe on a phone.
+     *
+     * The gradient div is not a placeholder, it is the real background. WebGL
+     * draws ON TOP of it when available. So a device without WebGL, a blocked
+     * CDN, or reduced-motion all land on a finished-looking hero rather than
+     * a blank box.
+     */
+    hero3d: ({ eyebrow, title, titleAccent, subtitle, primaryCta, secondaryCta, scene = "particles" }) => `
+  <section class="section hero hero--3d" id="top">
+    <div class="scene3d" data-scene="${esc(scene)}" aria-hidden="true">
+      <div class="scene3d__fallback"></div>
+    </div>
+    <div class="container hero-3d__inner">
+      ${eyebrow ? `<p class="eyebrow">${esc(eyebrow)}</p>` : ""}
+      <h1 class="hero-3d__title">${esc(title)}${titleAccent ? ` <span class="tone">${esc(titleAccent)}</span>` : ""}</h1>
+      ${subtitle ? `<p class="lede hero__lede">${esc(subtitle)}</p>` : ""}
+      <div class="hero__actions">
+          ${ctas(primaryCta, secondaryCta)}
       </div>
     </div>
   </section>`,
@@ -565,6 +593,15 @@ export const SECTION_CSS = `
 .faq__item p { margin: .85rem 0 0; color: var(--text-muted); }
 
 
+
+/* ── 3D hero ─────────────────────────────────────────────── */
+.hero--3d { display: grid; align-items: center; min-height: min(82vh, 760px); padding-block: clamp(4rem, 9vw, 7rem); }
+.hero-3d__inner { text-align: center; max-width: 60rem; margin-inline: auto; }
+.hero-3d__title { font-size: clamp(2.5rem, 7.5vw, 5.5rem); line-height: 1.02; letter-spacing: -0.03em; margin: 0 0 1rem; }
+.hero-3d__title .tone { color: var(--accent); }
+.hero--3d .hero__lede { margin-inline: auto; }
+.hero--3d .hero__actions { justify-content: center; }
+
 /* ── Rich footer ─────────────────────────────────────────────
    The brand column is wider than the link columns and the rest auto-fit, so
    the footer looks composed with two link columns or with five. */
@@ -720,6 +757,8 @@ export function renderPage(plan, archetype) {
                 // Sections that take artwork get it injected; the model never
                 // supplies it, so anything it happened to send is ignored.
                 if (s.type === "heroEditorial") return fn({ ...s, art: art.hero });
+                // The scene comes from the archetype, not the model.
+                if (s.type === "hero3d") return fn({ ...s, scene: sceneFor(t.name) });
                 if (s.type === "artBand") return fn({ ...s, art: art.band });
                 return fn(s);
             } catch (err) {
@@ -730,6 +769,11 @@ export function renderPage(plan, archetype) {
         .filter(Boolean)
         .join("\n");
 
+    // Three.js is ~150kB and only worth downloading when a 3D hero is
+    // actually on the page. Most pages don't have one, and a landing page for
+    // a roofer should not pay for a library it never uses.
+    const uses3d = (plan.sections || []).some((s) => s.type === "hero3d");
+
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -738,22 +782,24 @@ export function renderPage(plan, archetype) {
   <title>${esc(plan.title || plan.brand || "Website")}</title>
   <meta name="description" content="${esc(plan.metaDescription || "")}">
   <link rel="stylesheet" href="styles.css">
-${MOTION_CDN}
+${MOTION_CDN}${uses3d ? "\n" + WEBGL_CDN : ""}
 </head>
 <body>
 ${body}
   <script src="script.js" defer></script>
-  <script src="motion.js" defer></script>
+  <script src="motion.js" defer></script>${uses3d ? '\n  <script src="scene.js" defer></script>' : ""}
 </body>
 </html>
 `;
 
-    return {
+    const files = {
         "/index.html": html,
-        "/styles.css": baseStylesheet(t.name, plan.brand || "") + SECTION_CSS + ART_CSS + MOTION_CSS,
+        "/styles.css": baseStylesheet(t.name, plan.brand || "") + SECTION_CSS + ART_CSS + WEBGL_CSS + MOTION_CSS,
         "/script.js": SECTION_JS,
         "/motion.js": MOTION_JS,
     };
+    if (uses3d) files["/scene.js"] = WEBGL_JS;
+    return files;
 }
 
 // __-prefixed entries are internal helpers, not selectable sections.
@@ -768,7 +814,7 @@ export const SECTION_TYPES = Object.keys(SECTIONS).filter((k) => !k.startsWith("
  * and heroImage, giving the document two <h1> elements and two id="top"
  * anchors. Same lesson as images and archetypes: instruct, then enforce.
  */
-const HERO_TYPES = new Set(["heroImage", "heroSplit", "heroEditorial"]);
+const HERO_TYPES = new Set(["heroImage", "heroSplit", "heroEditorial", "hero3d"]);
 
 export function sanitizePlan(plan) {
     const notes = [];

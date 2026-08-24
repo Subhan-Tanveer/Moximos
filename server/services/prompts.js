@@ -636,6 +636,8 @@ Return a content plan as JSON matching the required schema.
 - "heroEditorial" — OVERSIZED headline hero with generated artwork behind it. Use this when the business sells craft, taste or expertise (design, food, premium services). { eyebrow, title, titleAccent, subtitle, primaryCta, secondaryCta, meta: [{label, value}] }
     * titleAccent is the TAIL of the headline, rendered in a second tone. Split it where the meaning turns: title "Yards that look" + titleAccent "cared for."
     * meta is 2-4 short credibility facts: {label:"Experience", value:"12 years"}
+- "hero3d"      — hero with a LIVE 3D WebGL backdrop (drifting particles, a rippling wave mesh, a receding grid, or turning wireframe orbs — chosen automatically from the archetype). Centred copy over live motion. { eyebrow, title, titleAccent, subtitle, primaryCta, secondaryCta }
+    * Use when the brand should feel modern, technical or premium. Avoid for a business whose photography is the selling point — a restaurant or landscaper is better served by heroImage.
 - "artBand"     — an illustrated strip that separates major sections. { caption } (optional short uppercase label). Artwork is generated automatically; do not supply it.
 - "numberedList" — 01/02/03 index rows. Better than cards when items are a sequence or a considered list. { id, eyebrow, title, intro, items: [{title, body, meta}] }
 - "marquee"     — scrolling band of short phrases. { texts: ["6 words max each"], separator } — use for service areas, specialisms, or trust signals.

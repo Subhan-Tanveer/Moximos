@@ -104,7 +104,7 @@ export const ContentPlanSchema = z.object({
     styleArchetype: z.enum(["Luxury", "Minimal", "Bold", "Organic", "Corporate", "Playful", "Editorial", "Futuristic"]),
     sections: z.array(
         z.object({
-            type: z.enum(["nav", "heroImage", "heroSplit", "heroEditorial", "artBand", "numberedList", "marquee", "gallery", "process", "faq", "stats", "cardGrid", "split", "testimonial", "ctaBand", "footer"]),
+            type: z.enum(["nav", "heroImage", "heroSplit", "heroEditorial", "hero3d", "artBand", "numberedList", "marquee", "gallery", "process", "faq", "stats", "cardGrid", "split", "testimonial", "ctaBand", "footer"]),
             id: z.string().optional(),
             variant: z.string().optional(),
             hours: z.string().optional(),
