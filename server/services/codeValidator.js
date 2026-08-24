@@ -31,8 +31,9 @@ export function validateAndFixCode(code, filePath, context) {
     code = code.replace(/\n```\s*$/, "");
 
     if (isCSS) {
-        // CSS-specific fixes — minimal, just trim and return
-        return { code: code.trim() + "\n", warnings };
+        const guarded = guardHiddenRules(code, filePath);
+        warnings.push(...guarded.warnings);
+        return { code: guarded.code.trim() + "\n", warnings };
     }
 
     if (filePath.endsWith(".html")) {
@@ -125,6 +126,13 @@ export function validateAndFixCode(code, filePath, context) {
             }
             return tag;
         });
+
+        // Inject the guard script whenever the page could hide content. It
+        // pairs with guardHiddenRules() in the stylesheet.
+        if (/<\/head>/i.test(code) && !code.includes("anim-ready")) {
+            code = code.replace(/<\/head>/i, ANIM_READY_SCRIPT + "\n</head>");
+            warnings.push(`${filePath}: injected the reveal guard so hidden-until-animated content cannot be stranded invisible`);
+        }
 
         return { code, warnings };
     }
@@ -389,3 +397,123 @@ function fixImportPaths(code, filePath, allPlannedFiles) {
 
     return { code: newCode, warnings };
 }
+
+/*
+ * Stop CSS from hiding content that JavaScript may never reveal.
+ *
+ * This is the single worst failure this builder produces, and the prompt has
+ * failed to prevent it. Measured on a live generation, with the rule stated in
+ * bold as non-negotiable: the model still wrote
+ *
+ *     .reveal { opacity: 0; transform: translateY(8px); ... }
+ *
+ * into the stylesheet. GSAP loaded, the script referenced it, and the reveal
+ * never fired — so a page holding 2,750 characters of real content rendered as
+ * a navigation bar above an empty black screen. The user's words: "it has done
+ * nothing literally".
+ *
+ * The repair has two halves, and BOTH are needed:
+ *
+ *   1. Scope every hiding rule behind `html.anim-ready`. That class is only
+ *      added by script, so if JavaScript is disabled, the CDN is blocked, the
+ *      script throws before running, or the visitor has reduced motion on, the
+ *      selector never matches and the content is simply visible.
+ *
+ *   2. A failsafe timer. Scoping alone does not cover the nastier case: the
+ *      class IS added, then the animation library fails or a ScrollTrigger
+ *      never fires. So a few seconds after load, anything still computed at
+ *      opacity 0 is forced visible. A late-appearing element is a cosmetic
+ *      flaw; an invisible page is a dead lead.
+ *
+ * Rules already scoped to a class (`.js .reveal`), and anything inside a
+ * prefers-reduced-motion block, are left alone — those are correct as written.
+ */
+const HIDING_DECL = /opacity\s*:\s*0(\.0+)?\s*(;|})/;
+
+function guardHiddenRules(css, filePath) {
+    const warnings = [];
+    // Split on rule boundaries while keeping at-rule blocks intact enough to
+    // detect. A full CSS parser is overkill for one declaration.
+    let guarded = 0;
+
+    const out = css.replace(/([^{}]+)\{([^{}]*)\}/g, (match, selectorRaw, body) => {
+        // A comment sitting above a rule is captured together with the
+        // selector. Split it off and re-emit it untouched — prefixing it
+        // produced invalid CSS:
+        //   html.anim-ready /* Reveal animation */ .reveal { ... }
+        const parts = selectorRaw.match(/^([\s\S]*\*\/)?([\s\S]*)$/);
+        const lead = (parts && parts[1]) || "";
+        const selector = ((parts && parts[2]) || selectorRaw).trim();
+
+        // Leave at-rules (@media, @keyframes, @supports) and their contents
+        // alone — a keyframe legitimately starts at opacity 0, and a
+        // reduced-motion block is already the safe path.
+        if (!selector || selector.startsWith("@") || /^\d+%$|^(from|to)$/.test(selector)) return match;
+        if (!HIDING_DECL.test(body)) return match;
+
+        // Already gated behind a scripting hook.
+        if (/^html\.[\w-]+|^\.js\b|\.anim-ready\b|\.is-loaded\b/.test(selector)) return match;
+
+        guarded++;
+        const scoped = selector
+            .split(",")
+            .map((s) => `html.anim-ready ${s.trim()}`)
+            .join(",\n");
+        return `${lead}${lead ? "\n" : ""}${scoped} {${body}}`;
+    });
+
+    if (guarded > 0) {
+        warnings.push(
+            `${filePath}: ${guarded} CSS rule(s) hid content with opacity:0 — scoped behind html.anim-ready so the page stays visible if the animation never runs`
+        );
+    }
+
+    return { code: out, warnings };
+}
+
+/*
+ * The script half of the guard, injected into <head>.
+ *
+ * Inline and synchronous on purpose: it must set the class before first paint,
+ * or content flashes visible and then hides.
+ */
+const ANIM_READY_SCRIPT = `  <script>
+    /* Injected guard: hidden-until-animated CSS is scoped behind this class,
+       so it only applies when this page can actually animate. */
+    (function () {
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) return;                       // never hide for reduced motion
+      var el = document.documentElement;
+      el.classList.add('anim-ready');
+      /* Failsafe: if anything is still invisible a few seconds after load, the
+         animation that was meant to reveal it did not run. Show it anyway —
+         a late element is a blemish, an invisible page is a lost lead. */
+      function rescue() {
+        setTimeout(function () {
+          var stuck = 0;
+          document.querySelectorAll('body *').forEach(function (node) {
+            var cs = getComputedStyle(node);
+            if (parseFloat(cs.opacity) === 0 && node.offsetParent !== null) {
+              /* Kill the transition as well as the hidden state. A rescue
+                 must be INSTANT: transitioning opacity from 0 to 1 does not
+                 advance at all while the tab is hidden (no frames are
+                 produced), so the element would stay invisible until focus.
+                 In a visible tab it would fade in slowly for content that
+                 should simply have been there. */
+              node.style.setProperty('transition', 'none', 'important');
+              node.style.setProperty('animation', 'none', 'important');
+              node.style.setProperty('opacity', '1', 'important');
+              node.style.setProperty('transform', 'none', 'important');
+              stuck++;
+            }
+          });
+          if (stuck) {
+            el.classList.remove('anim-ready');
+            console.warn('[guard] revealed ' + stuck + ' element(s) that were still hidden after load');
+          }
+        }, 2500);
+      }
+      if (document.readyState === 'complete') rescue();
+      else window.addEventListener('load', rescue);
+    })();
+  </script>`;
