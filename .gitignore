@@ -18,3 +18,4 @@ server/data/db.json
 _smoke*.mjs
 _probe*.mjs
 _cptest.mjs
+server/data/pglite/

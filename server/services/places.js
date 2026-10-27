@@ -4,7 +4,7 @@ import {
     incrementPlacesUsage,
     getCachedLeadSearch,
     saveCachedLeadSearch,
-    getAllKnownBusinesses,
+    getKnownBusinesses,
     saveKnownBusinessesBulk,
 } from "../store.js";
 import { evaluateSite } from "./siteEvaluator.js";
@@ -137,7 +137,7 @@ export async function searchBusinesses({ city, niche, minRating = 4.0, minReview
  * for this search again."
  */
 async function getRawPool(niche, city) {
-    const cached = getCachedLeadSearch(niche, city);
+    const cached = await getCachedLeadSearch(niche, city);
     if (cached) {
         const ageDays = (Date.now() - new Date(cached.fetchedAt).getTime()) / 86_400_000;
         if (ageDays < CACHE_TTL_DAYS) {
@@ -149,7 +149,7 @@ async function getRawPool(niche, city) {
         throw new PlacesConfigError("GOOGLE_PLACES_API_KEY is not set — add it to .env to enable real lead search.");
     }
 
-    const used = getPlacesUsageToday();
+    const used = await getPlacesUsageToday();
     if (used >= DAILY_CAP) {
         throw new PlacesCapError(used, DAILY_CAP);
     }
@@ -172,7 +172,7 @@ async function getRawPool(niche, city) {
     // Count the call the moment it's made, regardless of outcome — a
     // request that fails after Google received it still counts against
     // quota on Google's side, so the local cap should track the same way.
-    incrementPlacesUsage(1);
+    await incrementPlacesUsage(1);
 
     if (!res.ok) {
         const body = await res.text().catch(() => "");
@@ -184,10 +184,11 @@ async function getRawPool(niche, city) {
     const data = await res.json();
     const places = data.places || [];
 
-    // One synchronous read before the concurrent phase starts — not one
-    // per business inside it. See the note on saveKnownBusinessesBulk in
-    // store.js for why that distinction is load-bearing, not stylistic.
-    const knownBusinesses = getAllKnownBusinesses();
+    // Load the known businesses for THIS result set before the concurrent
+    // phase, rather than one lookup per business inside it. Only the ids that
+    // came back are fetched — never the whole table of every business ever
+    // discovered.
+    const knownBusinesses = await getKnownBusinesses(places.map((pl) => pl.id));
     const toPersist = {};
 
     const resolved = await pMap(
@@ -196,16 +197,15 @@ async function getRawPool(niche, city) {
         { concurrency: SITE_EVAL_CONCURRENCY }
     );
 
-    // One write after every fetch in the batch has finished — zero fs I/O
-    // while network requests are in flight.
-    saveKnownBusinessesBulk(toPersist);
+    // One batched write after every fetch in the batch has finished.
+    await saveKnownBusinessesBulk(toPersist);
 
     // Best rebuild-opportunity businesses first — baked into the cached
     // order so every future read of this (niche, city) pool, regardless of
     // rating/review/site-status filtering, stays ranked by opportunity.
     const results = resolved.sort((a, b) => (b.outdatedScore ?? 0) - (a.outdatedScore ?? 0));
 
-    saveCachedLeadSearch(niche, city, results);
+    await saveCachedLeadSearch(niche, city, results);
     return { results, fromCache: false, fetchedAt: new Date().toISOString() };
 }
 
@@ -266,6 +266,6 @@ function isEvalFresh(siteEval) {
     return ageDays < SITE_EVAL_TTL_DAYS;
 }
 
-export function getPlacesUsage() {
-    return { used: getPlacesUsageToday(), cap: DAILY_CAP };
+export async function getPlacesUsage() {
+    return { used: await getPlacesUsageToday(), cap: DAILY_CAP };
 }

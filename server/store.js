@@ -1,41 +1,18 @@
-import fs from "fs";
-import path from "path";
 import crypto from "crypto";
-import { fileURLToPath } from "url";
+import { query } from "./db.js";
 
 /**
- * Persistence for the real backend.
+ * Persistence for the backend.
  *
- * A single JSON file, not a database — deliberately. This project has no
- * budget for hosted infrastructure yet, and a flat file needs zero setup,
- * zero new services, and survives server restarts (which is already a real
- * improvement over the old frontend mock, whose data lived in one browser's
- * localStorage and vanished per-device). When this moves to real hosting,
- * swap loadDB/saveDB for a real database client — everything above this
- * module only calls the functions exported here, so that's a contained swap.
+ * Records are JSON documents stored in Postgres JSONB columns. The previous
+ * implementation was a single JSON file read and rewritten synchronously on
+ * every call; that cannot run on Vercel, whose filesystem is read-only and
+ * whose instances are discarded between requests (see db.js). Keeping the
+ * document shape means everything above this module still sees the same
+ * objects — only the calls became async.
+ *
+ * Every function below is async. Callers must await them.
  */
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, "data", "db.json");
-
-function loadDB() {
-    try {
-        const raw = fs.readFileSync(DB_PATH, "utf-8");
-        const db = JSON.parse(raw);
-        if (!db.placesUsage) db.placesUsage = {};
-        if (!db.leadSearches) db.leadSearches = {};
-        if (!db.businesses) db.businesses = {};
-        if (!db.sessions) db.sessions = {};
-        return db;
-    } catch {
-        return { users: [], projects: [], placesUsage: {}, leadSearches: {}, businesses: {}, sessions: {} };
-    }
-}
-
-function saveDB(db) {
-    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-}
 
 // --- Passwords ---
 // Node's built-in scrypt — no extra dependency, no native compilation risk.
@@ -58,68 +35,66 @@ export function verifyPassword(password, stored) {
 }
 
 // --- Sessions ---
-// Persisted (not in-memory) — this server gets restarted often during
-// development (every server-side code change), and an in-memory Map used to
-// mean every restart silently logged everyone out mid-session. That's not
-// just an inconvenience: a session dying while a project is polling for
-// generation progress makes the UI go blank with no error, which reads as
-// "the build is stuck" rather than "you got logged out."
+// Persisted, never in memory. On Vercel an in-memory Map would not merely
+// log people out on a restart: every request can land on a different
+// instance, so a session created by one would not exist on the next.
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // matches the cookie's Max-Age
 
-export function createSession(userId) {
+export async function createSession(userId) {
     const token = crypto.randomBytes(24).toString("hex");
-    const db = loadDB();
-    if (!db.sessions) db.sessions = {};
-    db.sessions[token] = { userId, createdAt: Date.now() };
-    saveDB(db);
+    await query(`INSERT INTO mx_sessions (token, user_id, created_at) VALUES ($1, $2, $3)`, [token, userId, Date.now()]);
     return token;
 }
 
-export function getSessionUserId(token) {
-    const db = loadDB();
-    const session = db.sessions?.[token];
+export async function getSessionUserId(token) {
+    if (!token) return null;
+    const rows = await query(`SELECT user_id, created_at FROM mx_sessions WHERE token = $1`, [token]);
+    const session = rows[0];
     if (!session) return null;
-    if (Date.now() - session.createdAt > SESSION_MAX_AGE_MS) {
-        delete db.sessions[token];
-        saveDB(db);
+    if (Date.now() - Number(session.created_at) > SESSION_MAX_AGE_MS) {
+        await query(`DELETE FROM mx_sessions WHERE token = $1`, [token]);
         return null;
     }
-    return session.userId;
+    return session.user_id;
 }
 
-export function destroySession(token) {
-    const db = loadDB();
-    if (db.sessions) {
-        delete db.sessions[token];
-        saveDB(db);
-    }
+export async function destroySession(token) {
+    await query(`DELETE FROM mx_sessions WHERE token = $1`, [token]);
 }
 
 // --- Users ---
-export function findUserByEmail(email) {
-    const db = loadDB();
-    return db.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase()) || null;
+const normaliseEmail = (email) => String(email || "").trim().toLowerCase();
+
+export async function findUserByEmail(email) {
+    const rows = await query(`SELECT data FROM mx_users WHERE email = $1`, [normaliseEmail(email)]);
+    return rows[0]?.data || null;
 }
 
-export function findUserById(id) {
-    const db = loadDB();
-    return db.users.find((u) => u._id === id) || null;
+export async function findUserById(id) {
+    const rows = await query(`SELECT data FROM mx_users WHERE id = $1`, [id]);
+    return rows[0]?.data || null;
 }
 
-export function createUser({ name, email, password }) {
-    const db = loadDB();
-    if (db.users.some((u) => u.email.toLowerCase() === email.trim().toLowerCase())) {
-        throw Object.assign(new Error("An account with that email already exists"), { status: 409 });
-    }
+export async function createUser({ name, email, password }) {
+    const clean = normaliseEmail(email);
     const user = {
         _id: crypto.randomUUID(),
-        name: name || email.split("@")[0],
-        email: email.trim().toLowerCase(),
+        name: name || clean.split("@")[0],
+        email: clean,
         passwordHash: hashPassword(password),
         createdAt: new Date().toISOString(),
     };
-    db.users.push(user);
-    saveDB(db);
+    // ON CONFLICT makes "does this email exist" and "insert it" one atomic
+    // statement. A check-then-insert leaves a window where two simultaneous
+    // sign-ups for the same address both pass the check.
+    const rows = await query(
+        `INSERT INTO mx_users (id, email, data) VALUES ($1, $2, $3::jsonb)
+         ON CONFLICT (email) DO NOTHING RETURNING id`,
+        [user._id, clean, JSON.stringify(user)]
+    );
+    if (rows.length === 0) {
+        throw Object.assign(new Error("An account with that email already exists"), { status: 409 });
+    }
     return user;
 }
 
@@ -130,75 +105,114 @@ export function publicUser(user) {
 }
 
 // --- Projects ---
-export function listProjects(userId) {
-    const db = loadDB();
-    return db.projects
-        .filter((p) => p.userId === userId)
-        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+// The sidebar needs a name and a date for every project, not the generated
+// files. Selecting just those fields keeps a user's project list from pulling
+// every file of every site they have ever built.
+export async function listProjects(userId) {
+    const rows = await query(
+        `SELECT jsonb_build_object(
+                    '_id', id,
+                    'name', data->'name',
+                    'description', data->'description',
+                    'version', data->'version',
+                    'createdAt', data->'createdAt',
+                    'updatedAt', data->'updatedAt'
+                ) AS project
+           FROM mx_projects
+          WHERE user_id = $1
+          ORDER BY updated_at DESC`,
+        [userId]
+    );
+    return rows.map((r) => r.project);
 }
 
-export function getProject(id, userId) {
-    const db = loadDB();
-    return db.projects.find((p) => p._id === id && p.userId === userId) || null;
+export async function getProject(id, userId) {
+    const rows = await query(`SELECT data FROM mx_projects WHERE id = $1 AND user_id = $2`, [id, userId]);
+    return rows[0]?.data || null;
 }
 
-export function getPublicProject(id) {
-    const db = loadDB();
-    return db.projects.find((p) => p._id === id && p.published) || null;
+export async function getPublicProject(id) {
+    const rows = await query(`SELECT data FROM mx_projects WHERE id = $1 AND published = true`, [id]);
+    return rows[0]?.data || null;
 }
 
-export function createProject(userId, data) {
-    const db = loadDB();
+export async function createProject(userId, data) {
+    const now = new Date().toISOString();
     const project = {
         _id: crypto.randomUUID(),
         userId,
         version: 1,
         published: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
         ...data,
     };
-    db.projects.push(project);
-    saveDB(db);
+    await query(`INSERT INTO mx_projects (id, user_id, published, data) VALUES ($1, $2, $3, $4::jsonb)`, [
+        project._id,
+        userId,
+        Boolean(project.published),
+        JSON.stringify(project),
+    ]);
     return project;
 }
 
-export function updateProject(id, userId, patch) {
-    const db = loadDB();
-    const idx = db.projects.findIndex((p) => p._id === id && p.userId === userId);
-    if (idx === -1) return null;
-    db.projects[idx] = { ...db.projects[idx], ...patch, updatedAt: new Date().toISOString() };
-    saveDB(db);
-    return db.projects[idx];
+/**
+ * Shallow-merge `patch` into a project and return the result, or null if no
+ * such project belongs to this user.
+ *
+ * The merge happens inside Postgres (`data || patch`) rather than as a
+ * read-modify-write in JavaScript. Generation calls this many times in quick
+ * succession from callbacks (stage changes, file progress, completed files),
+ * and a JS read-then-write lets one callback overwrite another's fields with
+ * a stale copy. The `||` operator replaces top-level keys exactly as the old
+ * spread did, but atomically.
+ */
+export async function updateProject(id, userId, patch) {
+    const full = { ...patch, updatedAt: new Date().toISOString() };
+    const rows = await query(
+        `UPDATE mx_projects
+            SET data       = data || $3::jsonb,
+                updated_at = now(),
+                published  = COALESCE(($3::jsonb ->> 'published')::boolean, published)
+          WHERE id = $1 AND user_id = $2
+      RETURNING data`,
+        [id, userId, JSON.stringify(full)]
+    );
+    return rows[0]?.data || null;
 }
 
-export function deleteProject(id, userId) {
-    const db = loadDB();
-    const before = db.projects.length;
-    db.projects = db.projects.filter((p) => !(p._id === id && p.userId === userId));
-    saveDB(db);
-    return db.projects.length < before;
+export async function deleteProject(id, userId) {
+    const rows = await query(`DELETE FROM mx_projects WHERE id = $1 AND user_id = $2 RETURNING id`, [id, userId]);
+    return rows.length > 0;
 }
 
 // --- Places API usage cap ---
-// Persisted (not in-memory) deliberately: this server gets restarted often
-// during development, and an in-memory counter would silently reset the cap
-// every time, defeating the entire point of having one on a billed API.
+// Persisted so the cap survives restarts — an in-memory counter would reset
+// on every cold start, defeating the point of a cap on a billed API.
 function todayKey() {
     return new Date().toISOString().slice(0, 10); // YYYY-MM-DD, UTC
 }
 
-export function getPlacesUsageToday() {
-    const db = loadDB();
-    return db.placesUsage[todayKey()] || 0;
+export async function getPlacesUsageToday() {
+    const rows = await query(`SELECT data FROM mx_kv WHERE ns = 'placesUsage' AND key = $1`, [todayKey()]);
+    return Number(rows[0]?.data?.count || 0);
 }
 
-export function incrementPlacesUsage(by = 1) {
-    const db = loadDB();
-    const key = todayKey();
-    db.placesUsage[key] = (db.placesUsage[key] || 0) + by;
-    saveDB(db);
-    return db.placesUsage[key];
+// One atomic upsert-and-add. The old read, add, write let two concurrent
+// searches both read the same count and both write count+1, so the counter
+// under-reported — and the hard cap on a billed API is only as reliable as
+// that counter.
+export async function incrementPlacesUsage(by = 1) {
+    const rows = await query(
+        `INSERT INTO mx_kv (ns, key, data)
+              VALUES ('placesUsage', $1, jsonb_build_object('count', $2::int))
+         ON CONFLICT (ns, key) DO UPDATE
+                 SET data = jsonb_build_object('count', (mx_kv.data ->> 'count')::int + $2::int),
+                     updated_at = now()
+           RETURNING (data ->> 'count')::int AS count`,
+        [todayKey(), by]
+    );
+    return Number(rows[0]?.count || 0);
 }
 
 // --- Lead search cache ---
@@ -206,78 +220,68 @@ export function incrementPlacesUsage(by = 1) {
 // since those are just filters over the same underlying pool of businesses.
 // The raw pool is cached once; a later search with a different rating
 // threshold on the same city+niche still hits the cache instead of paying
-// for another Google request. Every real business found through the Lead
-// Engine accumulates here, so the system genuinely never re-buys the same
-// lookup twice within the TTL window.
+// for another Google request.
 function leadCacheKey(niche, city) {
     return `${niche.trim().toLowerCase()}::${city.trim().toLowerCase()}`;
 }
 
-export function getCachedLeadSearch(niche, city) {
-    const db = loadDB();
-    return db.leadSearches[leadCacheKey(niche, city)] || null;
+export async function getCachedLeadSearch(niche, city) {
+    const rows = await query(`SELECT data FROM mx_kv WHERE ns = 'leadSearches' AND key = $1`, [leadCacheKey(niche, city)]);
+    return rows[0]?.data || null;
 }
 
-export function saveCachedLeadSearch(niche, city, rawResults) {
-    const db = loadDB();
-    db.leadSearches[leadCacheKey(niche, city)] = {
-        fetchedAt: new Date().toISOString(),
-        results: rawResults,
-    };
-    saveDB(db);
+export async function saveCachedLeadSearch(niche, city, rawResults) {
+    const value = { fetchedAt: new Date().toISOString(), results: rawResults };
+    await query(
+        `INSERT INTO mx_kv (ns, key, data) VALUES ('leadSearches', $1, $2::jsonb)
+         ON CONFLICT (ns, key) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+        [leadCacheKey(niche, city), JSON.stringify(value)]
+    );
 }
 
 // --- Known businesses ---
 // Keyed on Google's own Place ID — the stable identifier for one real,
-// specific business, independent of which search query happened to surface
-// it. The (niche, city) cache above avoids re-paying for the same search;
-// this avoids re-trusting Google's fresh response for a company we've
-// already captured, even when it turns up through a completely different
-// search. Once a business is known, our own record is authoritative for it.
-export function getKnownBusiness(placeId) {
+// specific business, independent of which search surfaced it. Once a business
+// is known, our own record is authoritative for it.
+export async function getKnownBusiness(placeId) {
     if (!placeId) return null;
-    const db = loadDB();
-    return db.businesses[placeId] || null;
+    const rows = await query(`SELECT data FROM mx_kv WHERE ns = 'businesses' AND key = $1`, [placeId]);
+    return rows[0]?.data || null;
 }
 
-export function saveKnownBusiness(placeId, data) {
+// Fetch only the businesses a search actually returned, as { placeId: record }.
+// This replaces getAllKnownBusinesses(), which returned the entire table —
+// harmless for a small JSON file in memory, but it would drag every business
+// ever discovered across the network on every single search.
+export async function getKnownBusinesses(placeIds) {
+    const ids = [...new Set((placeIds || []).filter(Boolean))];
+    if (ids.length === 0) return {};
+    const rows = await query(`SELECT key, data FROM mx_kv WHERE ns = 'businesses' AND key = ANY($1::text[])`, [ids]);
+    return Object.fromEntries(rows.map((r) => [r.key, r.data]));
+}
+
+async function upsertBusiness(placeId, data) {
+    const record = { ...data, placeId, firstSeenAt: new Date().toISOString() };
+    // On conflict keep the ORIGINAL firstSeenAt but take everything else
+    // from the new record.
+    await query(
+        `INSERT INTO mx_kv (ns, key, data) VALUES ('businesses', $1, $2::jsonb)
+         ON CONFLICT (ns, key) DO UPDATE
+                 SET data = $2::jsonb || jsonb_build_object(
+                         'firstSeenAt', COALESCE(mx_kv.data ->> 'firstSeenAt', $2::jsonb ->> 'firstSeenAt')
+                     ),
+                     updated_at = now()`,
+        [placeId, JSON.stringify(record)]
+    );
+}
+
+export async function saveKnownBusiness(placeId, data) {
     if (!placeId) return;
-    const db = loadDB();
-    const existing = db.businesses[placeId];
-    db.businesses[placeId] = {
-        ...data,
-        placeId,
-        firstSeenAt: existing?.firstSeenAt || new Date().toISOString(),
-    };
-    saveDB(db);
+    await upsertBusiness(placeId, data);
 }
 
-// Bulk variants — verified necessary, not just an optimization: calling
-// getKnownBusiness/saveKnownBusiness (each its own synchronous
-// readFileSync/writeFileSync) once per business INSIDE a concurrent fetch
-// loop was corrupting other in-flight fetches. Reproduced directly — adding
-// sync file I/O around evaluateSite() inside a pMap loop made an otherwise-
-// healthy fetch fail with a generic "fetch failed", matching the real bug
-// exactly. Synchronous fs calls block Node's single main thread; doing that
-// repeatedly while other network I/O is in flight stalls it at the wrong
-// moment. The fix: one read before the concurrent phase starts, one write
-// after it ends — zero fs I/O while fetches are actually in flight.
-export function getAllKnownBusinesses() {
-    const db = loadDB();
-    return db.businesses;
-}
-
-export function saveKnownBusinessesBulk(records) {
-    const entries = Object.entries(records);
+export async function saveKnownBusinessesBulk(records) {
+    const entries = Object.entries(records || {});
     if (entries.length === 0) return;
-    const db = loadDB();
-    for (const [placeId, data] of entries) {
-        const existing = db.businesses[placeId];
-        db.businesses[placeId] = {
-            ...data,
-            placeId,
-            firstSeenAt: existing?.firstSeenAt || new Date().toISOString(),
-        };
-    }
-    saveDB(db);
+    await Promise.all(entries.map(([placeId, data]) => upsertBusiness(placeId, data)));
 }

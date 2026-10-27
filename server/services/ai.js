@@ -765,7 +765,12 @@ async function generateFromSections(prompt, callbacks) {
     return { files, description: plan.metaDescription, qaIssues, stack: "html", contentPlan: plan };
 }
 
-export async function generateProject(prompt, callbacks){
+export async function generateProject(prompt, callbacks, options = {}){
+    // Optional wall-clock deadline (ms epoch). Optional polish phases are skipped
+    // when too little time remains, so a serverless time limit never cuts a
+    // generation off with half-written files.
+    const deadline = options?.deadline;
+    const timeLeft = () => (deadline ? deadline - Date.now() : Infinity);
     // A static landing page — the overwhelming majority of what this product
     // is asked for — goes through the section library. React/Next projects
     // still take the free-form path below, since they are genuine
@@ -919,7 +924,9 @@ export async function generateProject(prompt, callbacks){
 
     // Phase 3: Animation pass — a second, focused call per file adding
     // scroll reveals and micro-interactions on top of working layout/logic.
-    if (ENABLE_ANIMATION_PASS) {
+    if (ENABLE_ANIMATION_PASS && timeLeft() < 90_000) {
+        console.warn("[AI] Skipping animation pass — not enough time left before the deadline");
+    } else if (ENABLE_ANIMATION_PASS) {
         const animatable = Object.keys(files).filter((p) => !p.endsWith(".css"));
         console.log(`[AI] Phase 3: Animation pass over ${animatable.length} files`);
 
@@ -946,7 +953,7 @@ export async function generateProject(prompt, callbacks){
     // bugs the regex validator can't (broken hooks, mismatched exports,
     // dead handlers), not just malformed syntax.
     const qaIssues = [];
-    if (ENABLE_QA_PASS) {
+    if (ENABLE_QA_PASS && timeLeft() > 60_000) {
         const reviewable = Object.keys(files).filter((p) => !p.endsWith(".css"));
         console.log(`[AI] Phase 4: QA review over ${reviewable.length} files`);
 

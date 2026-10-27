@@ -1,4 +1,13 @@
-import esbuild from "esbuild";
+import { createRequire } from "module";
+
+// esbuild ships a native binary. If a serverless bundle fails to include it,
+// syntax checking is skipped instead of taking the whole API down at import.
+let esbuild = null;
+try {
+    esbuild = createRequire(import.meta.url)("esbuild");
+} catch (err) {
+    console.warn("[validator] esbuild unavailable — syntax checks disabled:", err?.message);
+}
 
 /**
  * Deterministic, non-AI verification for generated code — this is the
@@ -97,6 +106,8 @@ export function checkSyntax(code, filePath) {
 
     const loader =
         ext === "css" ? "css" : ext === "jsx" || ext === "js" ? "jsx" : ext === "tsx" || ext === "ts" ? "tsx" : "jsx";
+
+    if (!esbuild) return { valid: true, error: null };
 
     try {
         esbuild.transformSync(code, loader === "css" ? { loader } : { loader, jsx: "automatic" });
