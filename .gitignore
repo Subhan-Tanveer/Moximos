@@ -19,3 +19,6 @@ _smoke*.mjs
 _probe*.mjs
 _cptest.mjs
 server/data/pglite/
+
+.vercel
+.env*.local

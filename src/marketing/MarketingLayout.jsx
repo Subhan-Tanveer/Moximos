@@ -7,6 +7,7 @@ import SpaceBackdrop from "./scenes/SpaceBackdrop";
 import { useSmoothScroll } from "./animations/useSmoothScroll";
 import { usePointerTracking } from "./animations/usePointerTracking";
 import { useMotionPrefs } from "./animations/useMotionPrefs";
+import { useSeo } from "../seo/useSeo";
 
 /** Shown while a lazily-loaded route chunk arrives. */
 function RouteFallback() {
@@ -28,6 +29,7 @@ function RouteFallback() {
 export default function MarketingLayout() {
     const { animate } = useMotionPrefs();
 
+    useSeo();
     useSmoothScroll(animate);
     usePointerTracking(animate);
 
